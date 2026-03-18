@@ -137,6 +137,7 @@ nav:
       - Spot Account & Trading: spot-testnet/account&trades.md
       - WebSocket Market Data: spot-testnet/websocket-market-streams.md
       - WebSocket Account Info: spot-testnet/websocket-account-info.md
+      - Error Codes: spot-testnet/error-codes.md
 
   - Demo: demo/demo.md
 

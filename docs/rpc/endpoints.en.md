@@ -1,5 +1,3 @@
-## **Chain RPC Endpoints**
-
 ## Get Balance
 
 ``
