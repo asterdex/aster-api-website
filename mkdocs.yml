@@ -56,6 +56,10 @@ plugins:
             WebSocket Market Data: WebSocket 行情数据推送
             WebSocket Account Info: WebSocket 账户信息推送
             Error Codes: 错误码 
+            Futures Testnet: 合约测试网
+            Spot Testnet: 现货测试网
+            Spot V3: 现货 V3
+            RPC: 链上 RPC
             Aster Code: Aster Code
             Integration Flow: 对接流程
             Authentication: 鉴权方式
@@ -95,6 +99,13 @@ nav:
       - WebSocket Account Info: futures/user-data-streams.md
       - Error Codes: futures/error-codes.md
 
+  - Spot V3:
+      - General Info: spot-v3/general-info.md
+      - Market Data: spot-v3/market-data.md
+      - Spot Account & Trading: spot-v3/account&trades.md
+      - WebSocket Market Data: spot-v3/websocket-market-streams.md
+      - WebSocket Account Info: spot-v3/websocket-account-info.md
+
   - Spot: 
       - Overview: spot/spot-api-overview.md
       - Market Data: spot/market-data-api.md
@@ -108,8 +119,30 @@ nav:
       - Authentication: asterCode/authentication.md
       - Endpoints: asterCode/endpoints.md
 
+  - RPC:
+      - General Info: rpc/general-info.md
+      - Endpoints: rpc/endpoints.md
+
+  - Futures Testnet:
+      - General Info: futures-testnet/general-info.md
+      - Market Data: futures-testnet/market-data.md
+      - Futures Account & Trading: futures-testnet/account&trades.md
+      - WebSocket Market Data: futures-testnet/websocket-market-streams.md
+      - WebSocket Account Info: futures-testnet/user-data-streams.md
+      - Error Codes: futures-testnet/error-codes.md
+
+  - Spot Testnet:
+      - General Info: spot-testnet/general-info.md
+      - Market Data: spot-testnet/market-data.md
+      - Spot Account & Trading: spot-testnet/account&trades.md
+      - WebSocket Market Data: spot-testnet/websocket-market-streams.md
+      - WebSocket Account Info: spot-testnet/websocket-account-info.md
+
   - Demo: demo/demo.md
 
   - Changelog: 
       - Upcoming Changes: changelog/upcoming-changes.md
+      - 2026-3-18: changelog/2026-3-18.md
+      - 2026-3-17: changelog/2026-3-17.md
+      - 2026-3-11: changelog/2026-3-11.md
       - 2026-1-27: changelog/2026-1-27.md

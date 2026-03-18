@@ -252,6 +252,7 @@ This defines how long an order can remain valid before expiring.
 | IOC (Immediate or Cancel) | The order will execute immediately for any amount available. Any unfilled portion is automatically canceled. |
 | FOK (Fill or Kill) | The order must be fully executed immediately. If it cannot be filled in full, it is canceled right away. |
 | GTX (Good till crossing, Post only) | The post-only limit order will only be placed if it can be added as a maker order and not as a taker order.  |
+| HIDDEN | This type of order is not visible in the order book |
 
 **K-line interval:**
 

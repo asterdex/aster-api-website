@@ -1,3 +1,122 @@
+## **Noop**
+
+> **Response:**
+
+```javascript
+{
+ "code": 200,
+ "msg": "success"
+}
+```
+
+``POST /fapi/v3/noop``
+
+通过此请求，可以高效取消已发送但仍在队列中且尚未完成链上操作的交易（Nonce需与该请求一致,不保证成功）
+
+**Weight:**
+1
+
+#### 示例 : Noop (方法以python为例) 
+
+```python
+import time
+import urllib
+
+import aiohttp
+from eth_account.messages import  encode_structured_data
+from eth_account import Account
+import asyncio
+
+typed_data = {
+  "types": {
+    "EIP712Domain": [
+      {"name": "name", "type": "string"},
+      {"name": "version", "type": "string"},
+      {"name": "chainId", "type": "uint256"},
+      {"name": "verifyingContract", "type": "address"}
+    ],
+    "Message": [
+      { "name": "msg", "type": "string" }
+    ]
+  },
+  "primaryType": "Message",
+  "domain": {
+    "name": "AsterSignTransaction",
+    "version": "1",
+    "chainId": 1666,
+    "verifyingContract": "0x0000000000000000000000000000000000000000"
+  },
+  "message": {
+    "msg": "$msg"
+  }
+}
+
+headers = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'User-Agent': 'PythonApp/1.0'
+}
+host = 'https://fapi3.asterdex.com'
+
+# config your user and agent info here
+user = '*'
+signer = '*'
+private_key = "**"
+
+noop = {'url':'/fapi/v3/noop','method':'POST','params':{}}
+place_order = {"url":"/fapi/v3/order","method":"POST","params":{"symbol": "ASTERUSDT", "type": "LIMIT", "side": "BUY",
+                  "timeInForce": "GTC", "quantity": "20", "price": "0.5"}}
+_last_ms = 0
+_i = 0
+
+def get_nonce():
+    global _last_ms, _i
+    now_ms = int(time.time())
+
+    if now_ms == _last_ms:
+        _i += 1
+    else:
+        _last_ms = now_ms
+        _i = 0
+
+    return now_ms * 1_000_000 + _i
+
+async def send_by_url(api,nonce) :
+    my_dict = api['params']
+    url = host + api['url']
+
+    my_dict['nonce'] = nonce
+    my_dict['user'] = user
+    my_dict['signer'] = signer
+    param = urllib.parse.urlencode(my_dict)
+
+    typed_data['message']['msg'] = param
+    message = encode_structured_data(typed_data)
+    signed = Account.sign_message(message, private_key=private_key)
+
+    url = url + '?' + param + '&signature=' + signed.signature.hex()
+    print(url)
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, headers=headers) as resp:
+            text = await resp.text()
+            return {"status_code": resp.status, "text": text,'nonce': nonce}
+
+async def main():
+    _place_order_nonce = get_nonce()
+    task_place_order =asyncio.create_task( send_by_url(place_order, _place_order_nonce))
+    task_noop= asyncio.create_task( send_by_url(noop, _place_order_nonce))
+    place_order_result, noop_result = await asyncio.gather(task_place_order, task_noop)
+    print(f"place_order_result : {place_order_result['text']},nonce: {place_order_result['nonce']}")
+    print(f"noop_result : {noop_result['text']},nonce: {noop_result['nonce']}")
+
+if __name__ == '__main__':
+     asyncio.run(main())
+
+# This operation may not succeed every time. Please retry.
+# place_order_result : {"code":-4225,"msg":"Nonce Expired"},nonce: 1773321233000000
+# noop_result : {"code": 200,"msg": "success"},nonce: 1773321233000000
+
+```
+
 ## **测试服务器连通性 PING**
 ``
 GET /fapi/v3/ping
@@ -153,7 +272,8 @@ NONE
    				"GTC", // 成交为止, 一直有效
    				"IOC", // 无法立即成交(吃单)的部分就撤销
    				"FOK", // 无法全部立即成交就撤销
-   				"GTX" // 无法成为挂单方就撤销
+   				"GTX", // 无法成为挂单方就撤销
+				"HIDDEN"
  			],
  			"liquidationFee": "0.010000",	// 强平费率
    			"marketTakeBound": "0.30",	// 市价吃单(相对于标记价格)允许可造成的最大价格偏离比例
@@ -579,6 +699,44 @@ limit     | INT    | NO       | 默认值:100 最大值:1000
 * 如果 `startTime` 和 `endTime` 都未发送, 返回最近 `limit` 条数据.
 * 如果 `startTime` 和 `endTime` 之间的数据量大于 `limit`, 返回 `startTime` + `limit`情况下的数据。
 
+
+## **查询资金费率配置**
+
+> **响应:**
+
+```javascript
+[
+	{
+		"symbol": "INJUSDT",            // 交易对
+		"interestRate": "0.00010000",   // 利率
+		"time": 1756197479000,          // 更新时间
+		"fundingIntervalHours": 8,      // 资金费间隔小时数
+		"fundingFeeCap": 0.03,          // 资金费上限
+		"fundingFeeFloor": -0.03        // 资金费下限
+	},
+	{
+		"symbol": "ZORAUSDT",
+		"interestRate": "0.00005000",
+		"time": 1756197479000,
+		"fundingIntervalHours": 4,
+		"fundingFeeCap": 0.02,
+		"fundingFeeFloor": -0.02
+	}
+]
+```
+
+``
+GET /fapi/v3/fundingInfo
+``
+
+**权重:**
+1
+
+**参数:**
+
+| 名称 | 类型 | 是否必需 | 描述 |
+| --------- | ------ | -------- | ----- |
+| symbol | STRING | NO | 交易对 |
 
 ## **24hr价格变动情况**
 

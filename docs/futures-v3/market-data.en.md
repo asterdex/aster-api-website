@@ -1,3 +1,123 @@
+## **Noop**
+
+> **Response:**
+
+```javascript
+{
+ "code": 200,
+ "msg": "success"
+}
+```
+
+``POST /fapi/v3/noop``
+
+By using this request, it is possible to efficiently cancel previously sent transactions that are still in the queue and have not completed the on chain operation (Nonce should be equal to this request，no guarantee of success
+)
+
+**Weight:**
+1
+
+#### Demo : Noop (python)
+
+```python
+import time
+import urllib
+
+import aiohttp
+from eth_account.messages import  encode_structured_data
+from eth_account import Account
+import asyncio
+
+typed_data = {
+  "types": {
+    "EIP712Domain": [
+      {"name": "name", "type": "string"},
+      {"name": "version", "type": "string"},
+      {"name": "chainId", "type": "uint256"},
+      {"name": "verifyingContract", "type": "address"}
+    ],
+    "Message": [
+      { "name": "msg", "type": "string" }
+    ]
+  },
+  "primaryType": "Message",
+  "domain": {
+    "name": "AsterSignTransaction",
+    "version": "1",
+    "chainId": 1666,
+    "verifyingContract": "0x0000000000000000000000000000000000000000"
+  },
+  "message": {
+    "msg": "$msg"
+  }
+}
+
+headers = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'User-Agent': 'PythonApp/1.0'
+}
+host = 'https://fapi3.asterdex.com'
+
+# config your user and agent info here
+user = '*'
+signer = '*'
+private_key = "**"
+
+noop = {'url':'/fapi/v3/noop','method':'POST','params':{}}
+place_order = {"url":"/fapi/v3/order","method":"POST","params":{"symbol": "ASTERUSDT", "type": "LIMIT", "side": "BUY",
+                  "timeInForce": "GTC", "quantity": "20", "price": "0.5"}}
+_last_ms = 0
+_i = 0
+
+def get_nonce():
+    global _last_ms, _i
+    now_ms = int(time.time())
+
+    if now_ms == _last_ms:
+        _i += 1
+    else:
+        _last_ms = now_ms
+        _i = 0
+
+    return now_ms * 1_000_000 + _i
+
+async def send_by_url(api,nonce) :
+    my_dict = api['params']
+    url = host + api['url']
+
+    my_dict['nonce'] = nonce
+    my_dict['user'] = user
+    my_dict['signer'] = signer
+    param = urllib.parse.urlencode(my_dict)
+
+    typed_data['message']['msg'] = param
+    message = encode_structured_data(typed_data)
+    signed = Account.sign_message(message, private_key=private_key)
+
+    url = url + '?' + param + '&signature=' + signed.signature.hex()
+    print(url)
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, headers=headers) as resp:
+            text = await resp.text()
+            return {"status_code": resp.status, "text": text,'nonce': nonce}
+
+async def main():
+    _place_order_nonce = get_nonce()
+    task_place_order =asyncio.create_task( send_by_url(place_order, _place_order_nonce))
+    task_noop= asyncio.create_task( send_by_url(noop, _place_order_nonce))
+    place_order_result, noop_result = await asyncio.gather(task_place_order, task_noop)
+    print(f"place_order_result : {place_order_result['text']},nonce: {place_order_result['nonce']}")
+    print(f"noop_result : {noop_result['text']},nonce: {noop_result['nonce']}")
+
+if __name__ == '__main__':
+     asyncio.run(main())
+
+# This operation may not succeed every time. Please retry.
+# place_order_result : {"code":-4225,"msg":"Nonce Expired"},nonce: 1773321233000000
+# noop_result : {"code": 200,"msg": "success"},nonce: 1773321233000000
+
+```
+
 ## **Test Connectivity**
 
 > **Response:**
@@ -147,7 +267,8 @@ NONE
    				"GTC", 
    				"IOC", 
    				"FOK", 
-   				"GTX" 
+   				"GTX",
+          "HIDDEN" 
  			],
  			"liquidationFee": "0.010000",	// liquidation fee rate
    			"marketTakeBound": "0.30",	// the max price difference rate( from mark price) a market order can make
@@ -552,6 +673,45 @@ Mark Price and Funding Rate
 * If `startTime` and `endTime` are not sent, the most recent `limit` datas are returned.
 * If the number of data between `startTime` and `endTime` is larger than `limit`, return as `startTime` + `limit`.
 * In ascending order.
+
+
+## **Get Funding Rate Config**
+
+> **Response:**
+
+```javascript
+[
+	{
+		"symbol": "INJUSDT",
+		"interestRate": "0.00010000",
+		"time": 1756197479000,
+		"fundingIntervalHours": 8,
+		"fundingFeeCap": 0.03,
+		"fundingFeeFloor": -0.03
+	},
+	{
+		"symbol": "ZORAUSDT",
+		"interestRate": "0.00005000",
+		"time": 1756197479000,
+		"fundingIntervalHours": 4,
+		"fundingFeeCap": 0.02,
+		"fundingFeeFloor": -0.02
+	}
+]
+```
+
+``
+GET /fapi/v3/fundingInfo
+``
+
+**Weight:**
+1
+
+**Parameters:**
+
+| Name | Type | Mandatory | Description |
+| ------------ | ------------ | ------------ | ------------ |
+| symbol | STRING | NO | |
 
 ## **24hr Ticker Price Change Statistics**
 

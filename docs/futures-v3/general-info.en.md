@@ -5,7 +5,6 @@
 * The base endpoint is: **https://fapi.asterdex.com**
 * All endpoints return either a JSON object or array.
 * Data is returned in **ascending** order. Oldest first, newest last.
-* All time and timestamp related fields are in milliseconds.
 * All data types adopt definition in JAVA.
 
 ### HTTP Return Codes
@@ -42,6 +41,16 @@
 * For POST, PUT, and DELETE method APIs, send data in the request body (content type application/x-www-form-urlencoded)
 * Parameters may be sent in any order.
 
+### V3 Nonce Mechanism
+
+*  A nonce is essentially a number used to validate that a user request is valid, not duplicated, and not outdated. It is generally recommended to use the current timestamp as the nonce, preferably with microsecond precision, to ensure uniqueness and monotonicity.
+
+* When a new action comes in, the system first checks if that number has already been used—if it has, the action is rejected as a duplicate. If it's new, the system then checks whether it's too old compared to the recent ones it has already seen.
+
+* To do this efficiently, it only keeps a limited number of the most recent nonces for each user. If the list is already full and the new number is smaller than the oldest one in the list, it gets rejected because it's considered outdated. Otherwise, the system removes the oldest number and adds the new one.
+
+* In simple terms, this mechanism ensures that user actions are processed in a clean and reliable way—preventing repeated requests, ignoring stale ones, and only keeping track of the most relevant recent activity.
+
 ## **LIMITS**
 
 * The `/fapi/v3/exchangeInfo` `rateLimits` array contains objects related to the exchange's `RAW_REQUEST`, `REQUEST_WEIGHT`, and `ORDER` rate limits. These are further defined in the `ENUM definitions` section under `Rate limiters (rateLimitType)`.
@@ -70,16 +79,6 @@ It is strongly recommended to use websocket stream for getting data as much as p
 * Rejected/unsuccessful orders are not guaranteed to have `X-MBX-ORDER-COUNT-**` headers in the response.
 * **The order rate limit is counted against each account**.
 
-**Serious trading is about timing.** Networks can be unstable and unreliable,
-which can lead to requests taking varying amounts of time to reach the
-servers. With `recvWindow`, you can specify that the request must be
-processed within a certain number of milliseconds or be rejected by the
-server.
-
-<aside class="notice">
-It is recommended to use a small recvWindow of 5000 or less!
-</aside>
-
 ## **API authentication type**
 
 * Each API has its own authentication type, which determines what kind of authentication is required when accessing it.
@@ -91,7 +90,7 @@ It is recommended to use a small recvWindow of 5000 or less!
 | TRADE         | A valid signer and signature are required |
 | USER_DATA     | A valid signer and signature are required |
 | USER_STREAM   | A valid signer and signature are required |
-| MARKET_DATA   | A valid signer and signature are required |
+| MARKET_DATA   | API that does not require authentication |
 
 ## **Authentication signature payload**
 
@@ -103,34 +102,14 @@ It is recommended to use a small recvWindow of 5000 or less!
 | signature | Signature                          |
 
 ## **Endpoints requiring signature**
-* Security Type: TRADE, USER_DATA, USER_STREAM, MARKET_DATA
-* After converting the API parameters to strings, sort them by their key values in ASCII order to generate the final string. Note: All parameter values must be treated as strings during the signing process.
+* Security Type: TRADE, USER_DATA, USER_STREAM
 * After generating the string, combine it with the authentication signature parameters user, signer, and nonce, then use Web3’s ABI parameter encoding to generate the bytecode.
 * After generating the bytecode, use the Keccak algorithm to generate the hash.
 * Use the private key of **API wallet address** to sign the hash using web3’s ECDSA signature algorithm, generating the final signature.
 
-### Timing Security
-
-* A `SIGNED` endpoint also requires a parameter, `timestamp`, to be sent which
-  should be the millisecond timestamp of when the request was created and sent.
-* An additional parameter, `recvWindow`, may be sent to specify the number of
-  milliseconds after `timestamp` the request is valid for. If `recvWindow`
-  is not sent, **it defaults to 5000**.
-
-> The logic is as follows:
-
-```javascript
-if (timestamp < (serverTime + 1000) && (serverTime - timestamp) <= recvWindow){
-    // process request
-  } 
-  else {
-    // reject request
-  }
-```
 
 ## **Example of POST /fapi/v3/order**
 
-#### All parameters are passed through the request body (Python 3.9.6)
 
 #### The following parameters are API registration details. The values for user, signer, and privateKey are for demonstration purposes only (the privateKey corresponds to the signer).
 
@@ -160,6 +139,8 @@ long microsecond = now.getEpochSecond() * 1000000 + now.getNano() / 1000;
 
 ```python
 import time
+import urllib
+
 import requests
 from eth_account.messages import  encode_structured_data
 from eth_account import Account
@@ -192,15 +173,17 @@ headers = {
     'Content-Type': 'application/x-www-form-urlencoded',
     'User-Agent': 'PythonApp/1.0'
 }
-order_url = 'https://fapi.asterdex-testnet.com/fapi/v3/order'
+host = 'https://fapi3.asterdex.com'
 
 # config your user and agent info here
 user = '*'
 signer = '*'
 private_key = "*"
 
-def get_url(my_dict) -> str:
-       return '&'.join(f'{key}={str(value)}'for key, value in my_dict.items())
+place_order = {"url":"/fapi/v3/order","method":"POST","params":{"symbol": "ASTERUSDT", "type": "LIMIT", "side": "BUY",
+                  "timeInForce": "GTC", "quantity": "20", "price": "0.5"}}
+batch_orders = {"url":"/fapi/v3/batchOrders","method":"POST","params":{
+          "batchOrders":"[{'symbol':'ASTERUSDT','type':'LIMIT','side':'BUY','timeInForce':'GTC','quantity':'20','price':'0.5'},{'symbol':'ASTERUSDT','type':'LIMIT','side':'BUY','timeInForce':'GTC','quantity':'20','price':'0.5'}]" }}
 
 _last_ms = 0
 _i = 0
@@ -217,35 +200,36 @@ def get_nonce():
 
     return now_ms * 1_000_000 + _i
 
-def send_by_url() :
-    param = 'symbol=ASTERUSDT&side=BUY&type=LIMIT&quantity=10&price=0.6&timeInForce=GTC'
+def send_by_url(api) :
+    my_dict = api['params']
+    url = host + api['url']
 
-    param += '&nonce=' + str(get_nonce())
-    param += '&user=' + user
-    param += '&signer=' + signer
+    my_dict['nonce'] = str(get_nonce())
+    my_dict['user'] = user
+    my_dict['signer'] = signer
 
+    param = urllib.parse.urlencode(my_dict)
+
+    print(param)
     typed_data['message']['msg'] = param
     message = encode_structured_data(typed_data)
     signed = Account.sign_message(message, private_key=private_key)
-    print(signed.signature.hex())
 
-    url = order_url + '?' + param + '&signature=' + signed.signature.hex()
-
+    url = url + '?' + param + '&signature=' + signed.signature.hex()
     print(url)
     res = requests.post(url, headers=headers)
 
     print(res.text)
 
-def send_by_body() :
-       my_dict = {"symbol": "ASTERUSDT", "type": "LIMIT", "side": "BUY",
-                  "timeInForce": "GTC", "quantity": "10", "price": "0.6"}
-
+def send_by_body(api) :
+       my_dict = api['params']
+       url = host +api['url']
        my_dict['nonce'] = str(get_nonce())
        my_dict['user'] = user
        my_dict['signer'] = signer
 
-       content = get_url(my_dict)
-       typed_data['message']['msg'] = content
+       param = urllib.parse.urlencode(my_dict)
+       typed_data['message']['msg'] = param
        message = encode_structured_data(typed_data)
 
        signed = Account.sign_message(message, private_key=private_key)
@@ -254,13 +238,15 @@ def send_by_body() :
        my_dict['signature'] = signed.signature.hex()
 
        print(my_dict)
-       res = requests.post(order_url, data=my_dict, headers=headers)
+       res = requests.post(url, data=my_dict, headers=headers)
 
        print(res.text)
 
 if __name__ == '__main__':
-    send_by_url()
-    # send_by_body()
+    send_by_url(place_order)
+    # send_by_url(batch_orders)
+    # send_by_body(place_order)
+    # send_by_body(batch_orders)
 ```
 ## **Public Endpoints Info**
 
@@ -323,6 +309,7 @@ if __name__ == '__main__':
 * IOC - Immediate or Cancel
 * FOK - Fill or Kill
 * GTX - Good Till Crossing	(Post Only)
+* HIDDEN - HIDDEN This type of order is not visible in the order book
 
 **Working Type (workingType)**
 

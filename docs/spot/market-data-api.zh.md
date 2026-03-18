@@ -147,7 +147,8 @@ NONE
 			"GTC",
 			"IOC",
 			"FOK",
-			"GTX"
+			"GTX",
+			"HIDDEN"
 		],
 		"symbol": "BNBUSDT",
 		"ocoAllowed": false

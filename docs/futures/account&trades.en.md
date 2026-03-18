@@ -307,7 +307,7 @@ newOrderRespType | ENUM    | NO       | "ACK", "RESULT", default "ACK"
 * Batch orders are processed concurrently, and the order of matching is not guaranteed.
 * The order of returned contents for batch orders is the same as the order of the order list.
 
-## **Transfer Between Futures And Spot (USER_DATA)**
+## **Transfer Between Futures And Spot (TRANSFER)**
 
 > **Response:**
 
@@ -1469,6 +1469,32 @@ timestamp | LONG | YES
 
 
 
+
+## **Remaining Openable Notional Value (USER_DATA)**
+
+> **Response:**
+
+```javascript
+{
+	"remainingOpenableNotionalValue": 200 // User's current remaining openable notional value, USDT
+}
+```
+
+``
+GET /fapi/v1/remainingOpenableNotionalValue (HMAC SHA256)
+``
+
+**Weight:**
+20
+
+**Parameters:**
+
+| Name | Type | Mandatory | Description |
+| ------------ | ------------ | ------------ | ------------ |
+| symbol | STRING | YES | |
+| leverage | INT | YES | |
+| recvWindow | LONG | NO | |
+| timestamp | LONG | YES | |
 
 
 

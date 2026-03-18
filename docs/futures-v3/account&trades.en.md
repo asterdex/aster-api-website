@@ -15,7 +15,7 @@ Considering the possible data latency from RESTful endpoints during an extremely
 }
 ```
 
-``POST /fapi/v3/positionSide/dual (HMAC SHA256)``
+``POST /fapi/v3/positionSide/dual ``
 
 Change user's position mode (Hedge Mode or One-way Mode ) on ***EVERY symbol***
 
@@ -27,8 +27,6 @@ Change user's position mode (Hedge Mode or One-way Mode ) on ***EVERY symbol***
 | Name             | Type   | Mandatory | Description                               |
 | ---------------- | ------ | --------- | ----------------------------------------- |
 | dualSidePosition | STRING | YES       | "true": Hedge Mode; "false": One-way Mode |
-| recvWindow       | LONG   | NO        |                                           |
-| timestamp        | LONG   | YES       |                                           |
 
 ## **Get Current Position Mode(USER_DATA)**
 
@@ -40,7 +38,7 @@ Change user's position mode (Hedge Mode or One-way Mode ) on ***EVERY symbol***
 }
 ```
 
-``GET /fapi/v3/positionSide/dual (HMAC SHA256)``
+``GET /fapi/v3/positionSide/dual ``
 
 Get user's position mode (Hedge Mode or One-way Mode ) on ***EVERY symbol***
 
@@ -51,8 +49,6 @@ Get user's position mode (Hedge Mode or One-way Mode ) on ***EVERY symbol***
 
 | Name       | Type | Mandatory | Description |
 | ---------- | ---- | --------- | ----------- |
-| recvWindow | LONG | NO        |             |
-| timestamp  | LONG | YES       |             |
 
 ## **Change Multi-Assets Mode (TRADE)**
 
@@ -65,7 +61,7 @@ Get user's position mode (Hedge Mode or One-way Mode ) on ***EVERY symbol***
 }
 ```
 
-``POST /fapi/v3/multiAssetsMargin (HMAC SHA256)``
+``POST /fapi/v3/multiAssetsMargin ``
 
 Change user's Multi-Assets mode (Multi-Assets Mode or Single-Asset Mode) on ***Every symbol***
 
@@ -77,8 +73,6 @@ Change user's Multi-Assets mode (Multi-Assets Mode or Single-Asset Mode) on ***E
 | Name              | Type   | Mandatory | Description                                           |
 | ----------------- | ------ | --------- | ----------------------------------------------------- |
 | multiAssetsMargin | STRING | YES       | "true": Multi-Assets Mode; "false": Single-Asset Mode |
-| recvWindow        | LONG   | NO        |                                                       |
-| timestamp         | LONG   | YES       |                                                       |
 
 ## **Get Current Multi-Assets Mode (USER_DATA)**
 
@@ -90,7 +84,7 @@ Change user's Multi-Assets mode (Multi-Assets Mode or Single-Asset Mode) on ***E
 }
 ```
 
-``GET /fapi/v3/multiAssetsMargin (HMAC SHA256)``
+``GET /fapi/v3/multiAssetsMargin ``
 
 Get user's Multi-Assets mode (Multi-Assets Mode or Single-Asset Mode) on ***Every symbol***
 
@@ -101,8 +95,6 @@ Get user's Multi-Assets mode (Multi-Assets Mode or Single-Asset Mode) on ***Ever
 
 | Name       | Type | Mandatory | Description |
 | ---------- | ---- | --------- | ----------- |
-| recvWindow | LONG | NO        |             |
-| timestamp  | LONG | YES       |             |
 
 ## **New Order  (TRADE)**
 
@@ -136,7 +128,7 @@ Get user's Multi-Assets mode (Multi-Assets Mode or Single-Asset Mode) on ***Ever
 }
 ```
 
-``POST /fapi/v3/order  (HMAC SHA256)``
+``POST /fapi/v3/order  ``
 
 Send in a new order.
 
@@ -163,8 +155,6 @@ Send in a new order.
 | workingType      | ENUM    | NO        | stopPrice triggered by: "MARK_PRICE", "CONTRACT_PRICE". Default "CONTRACT_PRICE"                                                       |
 | priceProtect     | STRING  | NO        | "TRUE" or "FALSE", default "FALSE". Used with`STOP/STOP_MARKET` or `TAKE_PROFIT/TAKE_PROFIT_MARKET` orders.                            |
 | newOrderRespType | ENUM    | NO        | "ACK", "RESULT", default "ACK"                                                                                                         |
-| recvWindow       | LONG    | NO        |                                                                                                                                        |
-| timestamp        | LONG    | YES       |                                                                                                                                        |
 
 Additional mandatory parameters based on `type`:
 
@@ -249,7 +239,7 @@ Additional mandatory parameters based on `type`:
 ]
 ```
 
-``POST /fapi/v3/batchOrders  (HMAC SHA256)``
+``POST /fapi/v3/batchOrders  ``
 
 **Weight:**
 5
@@ -259,8 +249,6 @@ Additional mandatory parameters based on `type`:
 | Name        | Type       | Mandatory | Description              |
 | ----------- | ---------- | --------- | ------------------------ |
 | batchOrders | LIST | YES       | order list. Max 5 orders |
-| recvWindow  | LONG       | NO        |                          |
-| timestamp   | LONG       | YES       |                          |
 
 **Where ``batchOrders`` is the list of order parameters in JSON**
 
@@ -287,7 +275,7 @@ Additional mandatory parameters based on `type`:
 * The order of returned contents for batch orders is the same as the order of the order list.
 
 
-## **Transfer Between Futures And Spot (USER_DATA)**
+## **Transfer Between Futures And Spot (TRANSFER)**
 
 > **Response:**
 
@@ -299,7 +287,7 @@ Additional mandatory parameters based on `type`:
 ```
 
 ``
-POST /fapi/v3/asset/wallet/transfer  (HMAC SHA256)
+POST /fapi/v3/asset/wallet/transfer  (TRANSFER)
 ``
 
 **Weight:**
@@ -313,7 +301,6 @@ amount |	DECIMAL | 	YES |	amount
 asset |	STRING | 	YES |	asset
 clientTranId |	STRING | 	YES |	transaction id 
 kindType |	STRING | 	YES |	kindType
-timestamp	| LONG | YES	|	timestamp
 
 Notes:
 
@@ -354,7 +341,7 @@ Notes:
 }
 ```
 
-``GET /fapi/v3/order (HMAC SHA256)``
+``GET /fapi/v3/order ``
 
 Check an order's status.
 
@@ -373,8 +360,6 @@ Check an order's status.
 | symbol            | STRING | YES       |             |
 | orderId           | LONG   | NO        |             |
 | origClientOrderId | STRING | NO        |             |
-| recvWindow        | LONG   | NO        |             |
-| timestamp         | LONG   | YES       |             |
 
 Notes:
 
@@ -411,7 +396,7 @@ Notes:
 }
 ```
 
-``DELETE /fapi/v3/order  (HMAC SHA256)``
+``DELETE /fapi/v3/order  ``
 
 Cancel an active order.
 
@@ -425,8 +410,6 @@ Cancel an active order.
 | symbol            | STRING | YES       |             |
 | orderId           | LONG   | NO        |             |
 | origClientOrderId | STRING | NO        |             |
-| recvWindow        | LONG   | NO        |             |
-| timestamp         | LONG   | YES       |             |
 
 Either `orderId` or `origClientOrderId` must be sent.
 
@@ -441,7 +424,7 @@ Either `orderId` or `origClientOrderId` must be sent.
 }
 ```
 
-``DELETE /fapi/v3/allOpenOrders  (HMAC SHA256)``
+``DELETE /fapi/v3/allOpenOrders  ``
 
 **Weight:**
 1
@@ -451,8 +434,6 @@ Either `orderId` or `origClientOrderId` must be sent.
 | Name       | Type   | Mandatory | Description |
 | ---------- | ------ | --------- | ----------- |
 | symbol     | STRING | YES       |             |
-| recvWindow | LONG   | NO        |             |
-| timestamp  | LONG   | YES       |             |
 
 ## **Cancel Multiple Orders (TRADE)**
 
@@ -491,7 +472,7 @@ Either `orderId` or `origClientOrderId` must be sent.
 ]
 ```
 
-``DELETE /fapi/v3/batchOrders  (HMAC SHA256)``
+``DELETE /fapi/v3/batchOrders  ``
 
 **Weight:**
 1
@@ -503,8 +484,6 @@ Either `orderId` or `origClientOrderId` must be sent.
 | symbol                | STRING         | YES       |                                                                                                 |
 | orderIdList           | LIST\   | NO        | max length 10 e.g. [1234567,2345678]                                                      |
 | origClientOrderIdList | LIST\ | NO        | max length 10 e.g. ["my_id_1","my_id_2"], encode the double quotes. No space after comma. |
-| recvWindow            | LONG           | NO        |                                                                                                 |
-| timestamp             | LONG           | YES       |                                                                                                 |
 
 Either `orderIdList` or `origClientOrderIdList ` must be sent.
 
@@ -521,7 +500,7 @@ Either `orderIdList` or `origClientOrderIdList ` must be sent.
 
 Cancel all open orders of the specified symbol at the end of the specified countdown.
 
-``POST /fapi/v3/countdownCancelAll  (HMAC SHA256)``
+``POST /fapi/v3/countdownCancelAll  ``
 
 **Weight:**
 10
@@ -532,8 +511,6 @@ Cancel all open orders of the specified symbol at the end of the specified count
 | ------------- | ------ | --------- | -------------------------------------------------------- |
 | symbol        | STRING | YES       |                                                          |
 | countdownTime | LONG   | YES       | countdown time, 1000 for 1 second. 0 to cancel the timer |
-| recvWindow    | LONG   | NO        |                                                          |
-| timestamp     | LONG   | YES       |                                                          |
 
 * The endpoint should be called repeatedly as heartbeats so that the existing countdown time can be canceled and replaced by a new one.
 * Example usage:
@@ -574,7 +551,7 @@ Cancel all open orders of the specified symbol at the end of the specified count
 }
 ```
 
-``GET /fapi/v3/openOrder  (HMAC SHA256)``
+``GET /fapi/v3/openOrder  ``
 
 **Weight:** 1
 
@@ -585,8 +562,6 @@ Cancel all open orders of the specified symbol at the end of the specified count
 | symbol            | STRING | YES       |             |
 | orderId           | LONG   | NO        |             |
 | origClientOrderId | STRING | NO        |             |
-| recvWindow        | LONG   | NO        |             |
-| timestamp         | LONG   | YES       |             |
 
 * Either`orderId` or `origClientOrderId` must be sent
 * If the queried order has been filled or cancelled, the error message "Order does not exist" will be returned.
@@ -625,7 +600,7 @@ Cancel all open orders of the specified symbol at the end of the specified count
 ]
 ```
 
-``GET /fapi/v3/openOrders  (HMAC SHA256)``
+``GET /fapi/v3/openOrders  ``
 
 Get all open orders on a symbol. **Careful** when accessing this with no symbol.
 
@@ -637,8 +612,6 @@ Get all open orders on a symbol. **Careful** when accessing this with no symbol.
 | Name       | Type   | Mandatory | Description |
 | ---------- | ------ | --------- | ----------- |
 | symbol     | STRING | NO        |             |
-| recvWindow | LONG   | NO        |             |
-| timestamp  | LONG   | YES       |             |
 
 * If the symbol is not sent, orders for all symbols will be returned in an array.
 
@@ -676,7 +649,7 @@ Get all open orders on a symbol. **Careful** when accessing this with no symbol.
 ]
 ```
 
-``GET /fapi/v3/allOrders (HMAC SHA256)``
+``GET /fapi/v3/allOrders ``
 
 Get all account orders; active, canceled, or filled.
 
@@ -697,8 +670,6 @@ Get all account orders; active, canceled, or filled.
 | startTime  | LONG   | NO        |                        |
 | endTime    | LONG   | NO        |                        |
 | limit      | INT    | NO        | Default 500; max 1000. |
-| recvWindow | LONG   | NO        |                        |
-| timestamp  | LONG   | YES       |                        |
 
 **Notes:**
 
@@ -725,7 +696,7 @@ Get all account orders; active, canceled, or filled.
 ]
 ```
 
-``GET /fapi/v3/balance (HMAC SHA256)``
+``GET /fapi/v3/balance ``
 
 **Weight:**
 5
@@ -734,8 +705,6 @@ Get all account orders; active, canceled, or filled.
 
 | Name       | Type | Mandatory | Description |
 | ---------- | ---- | --------- | ----------- |
-| recvWindow | LONG | NO        |             |
-| timestamp  | LONG | YES       |             |
 
 ## **Account Information v3 (USER_DATA)**
 
@@ -815,7 +784,7 @@ Get all account orders; active, canceled, or filled.
 }
 ```
 
-``GET /fapi/v3/account (HMAC SHA256)``
+``GET /fapi/v3/account ``
 
 Get current account information.
 
@@ -826,8 +795,6 @@ Get current account information.
 
 | Name       | Type | Mandatory | Description |
 | ---------- | ---- | --------- | ----------- |
-| recvWindow | LONG | NO        |             |
-| timestamp  | LONG | YES       |             |
 
 ## **Change Initial Leverage (TRADE)**
 
@@ -841,7 +808,7 @@ Get current account information.
 }
 ```
 
-``POST /fapi/v3/leverage (HMAC SHA256)``
+``POST /fapi/v3/leverage ``
 
 Change user's initial leverage of specific symbol market.
 
@@ -854,8 +821,6 @@ Change user's initial leverage of specific symbol market.
 | ---------- | ------ | --------- | ------------------------------------------ |
 | symbol     | STRING | YES       |                                            |
 | leverage   | INT    | YES       | target initial leverage: int from 1 to 125 |
-| recvWindow | LONG   | NO        |                                            |
-| timestamp  | LONG   | YES       |                                            |
 
 ## **Change Margin Type (TRADE)**
 
@@ -868,7 +833,7 @@ Change user's initial leverage of specific symbol market.
 }
 ```
 
-``POST /fapi/v3/marginType (HMAC SHA256)``
+``POST /fapi/v3/marginType ``
 
 **Weight:**
 1
@@ -879,8 +844,6 @@ Change user's initial leverage of specific symbol market.
 | ---------- | ------ | --------- | ----------------- |
 | symbol     | STRING | YES       |                   |
 | marginType | ENUM   | YES       | ISOLATED, CROSSED |
-| recvWindow | LONG   | NO        |                   |
-| timestamp  | LONG   | YES       |                   |
 
 ## **Modify Isolated Position Margin (TRADE)**
 
@@ -895,7 +858,7 @@ Change user's initial leverage of specific symbol market.
 }
 ```
 
-``POST /fapi/v3/positionMargin (HMAC SHA256)``
+``POST /fapi/v3/positionMargin ``
 
 **Weight:**
 1
@@ -908,8 +871,6 @@ Change user's initial leverage of specific symbol market.
 | positionSide | ENUM    | NO        | Default`BOTH` for One-way Mode ; `LONG` or `SHORT` for Hedge Mode. It must be sent with Hedge Mode. |
 | amount       | DECIMAL | YES       |                                                                                                     |
 | type         | INT     | YES       | 1: Add position margin，2: Reduce position margin                                                   |
-| recvWindow   | LONG    | NO        |                                                                                                     |
-| timestamp    | LONG    | YES       |                                                                                                     |
 
 * Only for isolated symbol
 
@@ -938,7 +899,7 @@ Change user's initial leverage of specific symbol market.
 ]
 ```
 
-``GET /fapi/v3/positionMargin/history (HMAC SHA256)``
+``GET /fapi/v3/positionMargin/history ``
 
 **Weight:**
 1
@@ -952,8 +913,6 @@ Change user's initial leverage of specific symbol market.
 | startTime  | LONG   | NO        |                                                   |
 | endTime    | LONG   | NO        |                                                   |
 | limit      | INT    | NO        | Default: 500                                      |
-| recvWindow | LONG   | NO        |                                                   |
-| timestamp  | LONG   | YES       |                                                   |
 
 ## **Position Information v3 (USER_DATA)**
 
@@ -1018,7 +977,7 @@ Change user's initial leverage of specific symbol market.
 ]
 ```
 
-``GET /fapi/v3/positionRisk (HMAC SHA256)``
+``GET /fapi/v3/positionRisk ``
 
 Get current position information.
 
@@ -1030,8 +989,6 @@ Get current position information.
 | Name       | Type   | Mandatory | Description |
 | ---------- | ------ | --------- | ----------- |
 | symbol     | STRING | NO        |             |
-| recvWindow | LONG   | NO        |             |
-| timestamp  | LONG   | YES       |             |
 
 **Note**
 Please use with user data stream `ACCOUNT_UPDATE` to meet your timeliness and accuracy needs.
@@ -1061,7 +1018,7 @@ Please use with user data stream `ACCOUNT_UPDATE` to meet your timeliness and ac
 ]
 ```
 
-``GET /fapi/v3/userTrades  (HMAC SHA256)``
+``GET /fapi/v3/userTrades  ``
 
 Get trades for a specific account and symbol.
 
@@ -1077,8 +1034,6 @@ Get trades for a specific account and symbol.
 | endTime    | LONG   | NO        |                                                          |
 | fromId     | LONG   | NO        | Trade id to fetch from. Default gets most recent trades. |
 | limit      | INT    | NO        | Default 500; max 1000.                                   |
-| recvWindow | LONG   | NO        |                                                          |
-| timestamp  | LONG   | YES       |                                                          |
 
 * If `startTime` and `endTime` are both not sent, then the last 7 days' data will be returned.
 * The time between `startTime` and `endTime` cannot be longer than 7 days.
@@ -1113,7 +1068,7 @@ Get trades for a specific account and symbol.
 ]
 ```
 
-``GET /fapi/v3/income (HMAC SHA256)``
+``GET /fapi/v3/income ``
 
 **Weight:**
 30
@@ -1127,8 +1082,6 @@ Get trades for a specific account and symbol.
 | startTime  | LONG   | NO        | Timestamp in ms to get funding from INCLUSIVE.                                                                                   |
 | endTime    | LONG   | NO        | Timestamp in ms to get funding until INCLUSIVE.                                                                                  |
 | limit      | INT    | NO        | Default 100; max 1000                                                                                                            |
-| recvWindow | LONG   | NO        |                                                                                                                                  |
-| timestamp  | LONG   | YES       |                                                                                                                                  |
 
 * If neither `startTime` nor `endTime` is sent, the recent 7-day data will be returned.
 * If `incomeType ` is not sent, all kinds of flow will be returned
@@ -1184,8 +1137,6 @@ Get trades for a specific account and symbol.
 | Name       | Type   | Mandatory | Description |
 | ---------- | ------ | --------- | ----------- |
 | symbol     | STRING | NO        |             |
-| recvWindow | LONG   | NO        |             |
-| timestamp  | LONG   | YES       |             |
 
 ## **Position ADL Quantile Estimation (USER_DATA)**
 
@@ -1225,8 +1176,6 @@ Get trades for a specific account and symbol.
 | Name       | Type   | Mandatory | Description |
 | ---------- | ------ | --------- | ----------- |
 | symbol     | STRING | NO        |             |
-| recvWindow | LONG   | NO        |             |
-| timestamp  | LONG   | YES       |             |
 
 * Values update every 30s.
 * Values 0, 1, 2, 3, 4 shows the queue position and possibility of ADL from low to high.
@@ -1302,8 +1251,6 @@ Get trades for a specific account and symbol.
 | startTime     | LONG   | NO        |                                                             |
 | endTime       | LONG   | NO        |                                                             |
 | limit         | INT    | NO        | Default 50; max 100.                                        |
-| recvWindow    | LONG   | NO        |                                                             |
-| timestamp     | LONG   | YES       |                                                             |
 
 * If "autoCloseType" is not sent, orders with both of the types will be returned
 * If "startTime" is not sent, data within 7 days before "endTime" can be queried
@@ -1320,7 +1267,7 @@ Get trades for a specific account and symbol.
 }
 ```
 
-``GET /fapi/v3/commissionRate (HMAC SHA256)``
+``GET /fapi/v3/commissionRate ``
 
 **Weight:**
 20
@@ -1330,5 +1277,3 @@ Get trades for a specific account and symbol.
 | Name       | Type   | Mandatory | Description |
 | ---------- | ------ | --------- | ----------- |
 | symbol     | STRING | YES       |             |
-| recvWindow | LONG   | NO        |             |
-| timestamp  | LONG   | YES       |             |

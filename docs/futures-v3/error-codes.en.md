@@ -78,11 +78,6 @@ Codes are universal,but messages can vary.
 
 * This operation is not supported.
 
-> -1021 INVALID_TIMESTAMP
-
-* Timestamp for this request is outside of the recvWindow.
-* Timestamp for this request was 1000ms ahead of the server's time.
-
 > -1022 INVALID_SIGNATURE
 
 * Signature for this request is not valid.

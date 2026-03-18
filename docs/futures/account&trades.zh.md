@@ -333,7 +333,7 @@ newOrderRespType | ENUM    | NO       | "ACK", "RESULT", 默认 "ACK"
 * 批量下单采取并发处理，不保证订单撮合顺序
 * 批量下单的返回内容顺序，与订单列表顺序一致
 
-## **期货现货互转 (TRADE)**
+## **期货现货互转 (TRANSFER)**
 
 > **响应:**
 
@@ -1469,6 +1469,32 @@ symbol | STRING | YES
 recvWindow | LONG | NO	
 timestamp | LONG | YES
 
+
+## **剩余可开仓名义价值 (USER_DATA)**
+
+> **响应:**
+
+```javascript
+{
+	"remainingOpenableNotionalValue": 200 //用户当前可开仓名义价值，单位USDT
+}
+```
+
+``
+GET /fapi/v1/remainingOpenableNotionalValue (HMAC SHA256)
+``
+
+**权重:**
+20
+
+**参数:**
+
+| 名称 | 类型 | 是否必需 | 描述 |
+| ------------ | ------------ | ------------ | ------------ |
+| symbol | STRING | YES | |
+| leverage | INT | YES | |
+| recvWindow | LONG | NO | |
+| timestamp | LONG | YES | |
 
 
 

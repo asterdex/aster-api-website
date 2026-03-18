@@ -144,7 +144,8 @@ Test if the REST API can be reached and retrieve the server time.
 			"GTC",
 			"IOC",
 			"FOK",
-			"GTX"
+			"GTX",
+			"HIDDEN"
 		],
 		"symbol": "BNBUSDT",
 		"ocoAllowed": false

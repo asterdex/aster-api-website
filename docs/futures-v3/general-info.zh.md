@@ -5,7 +5,6 @@
 * 本篇列出REST接口的baseurl **https://fapi.asterdex.com**
 * 所有接口的响应都是JSON格式
 * 响应中如有数组，数组元素以时间升序排列，越早的数据越提前。
-* 所有时间、时间戳均为UNIX时间，单位为毫秒
 * 所有数据类型采用JAVA的数据类型定义
 
 ### HTTP 返回代码
@@ -36,6 +35,15 @@
 * `POST`, `PUT`, 和 `DELETE` 方法的接口, 在 `request body`中发送(content type `application/x-www-form-urlencoded`)
 * 对参数的顺序不做要求。
 
+### V3 Nonce 机制
+
+* nonce 本质上是一个用于校验用户请求是否有效、是否重复以及是否过期的数字。通常建议用户直接使用当前时间戳（timestamp）作为 nonce，并使用微秒级（microsecond）精度，以确保其唯一性和递增性。
+* 当一个新的请求到来时，系统会先检查这个 nonce 是否已经被使用过——如果是，就会将该请求判定为重复请求并拒绝。如果是新的 nonce，系统会进一步判断它是否相对于当前已记录的那些 nonce 来说过旧。
+
+* 为了提高效率，系统只会为每个用户保存有限数量的最近 nonce。如果这个列表已经满了，而新的 nonce 又比列表中最旧的那个还小，那么该请求就会被拒绝，因为它被认为是过期的。否则，系统会移除最旧的 nonce，并将新的 nonce 加入列表。
+
+* 简单来说，这种机制可以确保用户请求以一种干净、可靠的方式被处理——既能防止重复请求，又能忽略过期请求，同时只保留最相关的近期操作记录。
+
 ## **访问限制**
 * 在 `/fapi/v3/exchangeInfo`接口中`rateLimits`数组里包含有REST接口(不限于本篇的REST接口)的访问限制。包括带权重的访问频次限制、下单速率限制。本篇`枚举定义`章节有限制类型的进一步说明。
 * 违反上述任何一个访问限制都会收到HTTP 429，这是一个警告.
@@ -63,14 +71,6 @@
 * 被拒绝或不成功的下单并不保证回报中包含以上头内容。
 * **下单频率限制是基于每个账户计数的。**
 
-**关于交易时效性** 
-互联网状况并不100%可靠，不可完全依赖,因此你的程序本地到服务器的时延会有抖动.
-这是我们设置`recvWindow`的目的所在，如果你从事高频交易，对交易时效性有较高的要求，可以灵活设置recvWindow以达到你的要求。
-
-<aside class="notice">
-不推荐使用5秒以上的recvWindow
-</aside>
-
 ## **接口鉴权类型**
 * 每个接口都有自己的鉴权类型，鉴权类型决定了访问时应当进行何种鉴权
 * 如果需要鉴权，应当在请求体中添加signer
@@ -81,7 +81,7 @@ NONE | 不需要鉴权的接口
 TRADE | 需要有效的signer和签名
 USER_DATA | 需要有效的signer和签名
 USER_STREAM | 需要有效的signer和签名
-MARKET_DATA | 需要有效的signer和签名
+MARKET_DATA | 不需要鉴权的接口
 
 ## **鉴权签名体**
 参数 | 描述
@@ -92,29 +92,14 @@ nonce | 当前时间戳,单位为微秒
 signature | 签名
 
 ## **需要签名的接口**
-* TRADE 与 USER_DATA,USER_STREAM,MARKET_DATA
-* 接口参数转字符串后按照key值ASCII编码后生成的字符串 请注意所有参数取值请以字符串的方式进行签名
+* TRADE 与 USER_DATA,USER_STREAM
 * 生成字符串后在与鉴权签名参数的user,signer,nonce使用web3的abi参数编码生成字节码
 * 生成字节码后使用Keccak算法生成hash
 * 使用派生地址的私钥用web3的ecdsa签名算法对该hash进行签名生成signature
 
-### 时间同步安全
-* 签名接口均需要传递`timestamp`参数,其值应当是请求发送时刻的unix时间戳(毫秒)
-* 服务器收到请求时会判断请求中的时间戳,如果是5000毫秒之前发出的,则请求会被认为无效。这个时间窗口值可以通过发送可选参数`recvWindow`来自定义。
-
-> 逻辑伪代码：
-  
-  ```javascript
-  if (timestamp < (serverTime + 1000) && (serverTime - timestamp) <= recvWindow) {
-    // process request
-  } else {
-    // reject request
-  }
-  ```
 
 ## **POST /fapi/v3/order 的示例**
 
-#### 所有参数均通过from body请求(Python 3.9.6)
 
 #### 示例 : 以下参数为api注册信息,user,signer,privateKey仅供示范(privateKey为signer的私钥)
 
@@ -141,6 +126,8 @@ long microsecond = now.getEpochSecond() * 1000000 + now.getNano() / 1000;
 
 ```python
 import time
+import urllib
+
 import requests
 from eth_account.messages import  encode_structured_data
 from eth_account import Account
@@ -173,15 +160,17 @@ headers = {
     'Content-Type': 'application/x-www-form-urlencoded',
     'User-Agent': 'PythonApp/1.0'
 }
-order_url = 'https://fapi.asterdex-testnet.com/fapi/v3/order'
+host = 'https://fapi3.asterdex.com'
 
 # config your user and agent info here
 user = '*'
 signer = '*'
 private_key = "*"
 
-def get_url(my_dict) -> str:
-       return '&'.join(f'{key}={str(value)}'for key, value in my_dict.items())
+place_order = {"url":"/fapi/v3/order","method":"POST","params":{"symbol": "ASTERUSDT", "type": "LIMIT", "side": "BUY",
+                  "timeInForce": "GTC", "quantity": "20", "price": "0.5"}}
+batch_orders = {"url":"/fapi/v3/batchOrders","method":"POST","params":{
+          "batchOrders":"[{'symbol':'ASTERUSDT','type':'LIMIT','side':'BUY','timeInForce':'GTC','quantity':'20','price':'0.5'},{'symbol':'ASTERUSDT','type':'LIMIT','side':'BUY','timeInForce':'GTC','quantity':'20','price':'0.5'}]" }}
 
 _last_ms = 0
 _i = 0
@@ -198,35 +187,36 @@ def get_nonce():
 
     return now_ms * 1_000_000 + _i
 
-def send_by_url() :
-    param = 'symbol=ASTERUSDT&side=BUY&type=LIMIT&quantity=10&price=0.6&timeInForce=GTC'
+def send_by_url(api) :
+    my_dict = api['params']
+    url = host + api['url']
 
-    param += '&nonce=' + str(get_nonce())
-    param += '&user=' + user
-    param += '&signer=' + signer
+    my_dict['nonce'] = str(get_nonce())
+    my_dict['user'] = user
+    my_dict['signer'] = signer
 
+    param = urllib.parse.urlencode(my_dict)
+
+    print(param)
     typed_data['message']['msg'] = param
     message = encode_structured_data(typed_data)
     signed = Account.sign_message(message, private_key=private_key)
-    print(signed.signature.hex())
 
-    url = order_url + '?' + param + '&signature=' + signed.signature.hex()
-
+    url = url + '?' + param + '&signature=' + signed.signature.hex()
     print(url)
     res = requests.post(url, headers=headers)
 
     print(res.text)
 
-def send_by_body() :
-       my_dict = {"symbol": "ASTERUSDT", "type": "LIMIT", "side": "BUY",
-                  "timeInForce": "GTC", "quantity": "10", "price": "0.6"}
-
+def send_by_body(api) :
+       my_dict = api['params']
+       url = host +api['url']
        my_dict['nonce'] = str(get_nonce())
        my_dict['user'] = user
        my_dict['signer'] = signer
 
-       content = get_url(my_dict)
-       typed_data['message']['msg'] = content
+       param = urllib.parse.urlencode(my_dict)
+       typed_data['message']['msg'] = param
        message = encode_structured_data(typed_data)
 
        signed = Account.sign_message(message, private_key=private_key)
@@ -235,13 +225,15 @@ def send_by_body() :
        my_dict['signature'] = signed.signature.hex()
 
        print(my_dict)
-       res = requests.post(order_url, data=my_dict, headers=headers)
+       res = requests.post(url, data=my_dict, headers=headers)
 
        print(res.text)
 
 if __name__ == '__main__':
-    send_by_url()
-    # send_by_body()
+    send_by_url(place_order)
+    # send_by_url(batch_orders)
+    # send_by_body(place_order)
+    # send_by_body(batch_orders)
 ```
 
 ## **公开API参数**
@@ -306,6 +298,7 @@ if __name__ == '__main__':
 * IOC - Immediate or Cancel 无法立即成交(吃单)的部分就撤销
 * FOK - Fill or Kill 无法全部立即成交就撤销
 * GTX - Good Till Crossing 无法成为挂单方就撤销
+* HIDDEN - HIDDEN 该类型订单在订单薄里不可见
 
 **条件价格触发类型 (workingType)**
 
