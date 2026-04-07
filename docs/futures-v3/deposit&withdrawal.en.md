@@ -165,6 +165,8 @@ response:
 
 ## **get user withdraw info**
 
+> **Deprecated:** This V1 interface will be discontinued in the future. Please migrate to the [V3 version](#get-user-withdraw-infov3).
+
 * Note: Follow the [API-KEY Signature (V1)](#api-key-signature-v1) instructions to generate the required request signature.
 
 ### request:
@@ -226,6 +228,8 @@ No additional parameters required beyond the standard V1 signature parameters (`
 
 ## **get deposit and withdraw history**
 
+> **Deprecated:** This V1 interface will be discontinued in the future. Please migrate to the [V3 version](#get-deposit-and-withdraw-historyv3).
+
 * Note: Follow the [API-KEY Signature (V1)](#api-key-signature-v1) instructions to generate the required request signature.
 
 ### request:
@@ -259,6 +263,112 @@ No additional parameters required beyond the standard V1 signature parameters (`
 
 | field       | desc                                                    |
 |-------------|---------------------------------------------------------|
+| id          | Record ID                                               |
+| type        | Record type: `DEPOSIT` or `WITHDRAW`                    |
+| asset       | Asset name, e.g., USDT                                  |
+| amount      | Amount                                                  |
+| state       | Status: `PROCESSING`, `SUCCESS`, or `FAILED`            |
+| txHash      | On-chain transaction hash                               |
+| time        | Record time in milliseconds (Unix)                      |
+| chainId     | Chain ID                                                |
+| accountType | Account type: `spot` or `perp`                          |
+
+## **get user withdraw info\[v3\]**
+
+* Note: Follow the [Pro API-KEY Signature (V3)](#pro-api-key-signature-v3) instructions to generate the required request signature. The example below includes only the parameters specific to this endpoint.
+
+### request:
+
+```shell
+curl --location --request POST 'https://fapi.asterdex.com/fapi/v3/aster/user-withdraw-info' \
+  --header 'Content-Type: application/json'
+```
+
+### params:
+
+No additional parameters required beyond the standard V3 signature parameters.
+
+### response:
+
+```json
+{
+    "userDailyLimit": "10000",
+    "userRemainingDailyLimit": "9000",
+    "totalDailyLimit": "1000000",
+    "totalRemainingDailyLimit": "980000",
+    "balances": {
+        "USDT": {
+            "currency": "USDT",
+            "spotTotalWithdrawAmount": "500",
+            "perpTotalWithdrawAmount": "300",
+            "dailyLimit": "9000",
+            "chainBalances": {
+                "56": {
+                    "chainId": 56,
+                    "spotMaxWithdrawAmount": "500",
+                    "perpMaxWithdrawAmount": "300",
+                    "chainLimit": "800",
+                    "withdrawFee": "0.5"
+                }
+            }
+        }
+    }
+}
+```
+
+| field                                        | desc                                                                  |
+|----------------------------------------------|-----------------------------------------------------------------------|
+| userDailyLimit                               | User's daily withdrawal limit, denominated in USD                     |
+| userRemainingDailyLimit                      | User's remaining daily withdrawal limit, denominated in USD           |
+| totalDailyLimit                              | Global daily withdrawal limit, denominated in USD                     |
+| totalRemainingDailyLimit                     | Global remaining daily withdrawal limit, denominated in USD           |
+| balances                                     | Map of non-zero asset balances, keyed by asset name                   |
+| balances.currency                            | Asset name                                                            |
+| balances.spotTotalWithdrawAmount             | Total spot balance available for withdrawal                           |
+| balances.perpTotalWithdrawAmount             | Total futures balance available for withdrawal                        |
+| balances.dailyLimit                          | Remaining daily withdrawal limit for this asset, denominated in USD   |
+| balances.chainBalances                       | Per-chain balance info, keyed by chain ID                             |
+| balances.chainBalances.chainId               | Chain ID                                                              |
+| balances.chainBalances.spotMaxWithdrawAmount | Max withdrawable spot amount on this chain                            |
+| balances.chainBalances.perpMaxWithdrawAmount | Max withdrawable futures amount on this chain                         |
+| balances.chainBalances.chainLimit            | Max withdrawable amount on this chain                                 |
+| balances.chainBalances.withdrawFee           | Withdrawal fee on this chain                                          |
+
+## **get deposit and withdraw history\[v3\]**
+
+* Note: Follow the [Pro API-KEY Signature (V3)](#pro-api-key-signature-v3) instructions to generate the required request signature. The example below includes only the parameters specific to this endpoint.
+
+### request:
+
+```shell
+curl --location --request POST 'https://fapi.asterdex.com/fapi/v3/aster/deposit-withdraw-history' \
+  --header 'Content-Type: application/json'
+```
+
+### params:
+
+No additional parameters required beyond the standard V3 signature parameters.
+
+### response:
+
+```json
+[
+    {
+        "id": "1234567",
+        "type": "DEPOSIT",
+        "asset": "USDT",
+        "amount": "100",
+        "state": "SUCCESS",
+        "txHash": "0x9a40f0119b670fb6b155744b51981f91c4c4c8a20c333441a63853fe7d055c90",
+        "time": 1742198400000,
+        "chainId": 56,
+        "accountType": "spot"
+    }
+]
+```
+
+| field       | desc                                                    |
+|-------------|---------------------------------------------------------------|
 | id          | Record ID                                               |
 | type        | Record type: `DEPOSIT` or `WITHDRAW`                    |
 | asset       | Asset name, e.g., USDT                                  |
@@ -488,6 +598,8 @@ const userSignature = bs58.encode(signatureBytes);
 
 ## **withdraw by fapi \[evm\] \[futures\]**
 
+> **Deprecated:** This V1 interface will be discontinued in the future. Please migrate to the [V3 version](#withdraw-by-fapiv3-evm-futures).
+
 * Note: Follow the [API-KEY Signature (V1)](#api-key-signature-v1) instructions to generate the required request signature. The example below includes only the parameters specific to this endpoint.
 
 request:
@@ -526,6 +638,8 @@ response:
 
 ## **withdraw by API \[evm\] \[spot\]**
 
+> **Deprecated:** This V1 interface will be discontinued in the future. Please migrate to the [V3 version](#withdraw-by-fapiv3-evm-spot).
+
 request:
 
 ```shell
@@ -562,6 +676,8 @@ response:
 
 ## **withdraw by fapi \[solana\] \[futures\]**
 
+> **Deprecated:** This V1 interface will be discontinued in the future. Please migrate to the [V3 version](#withdraw-by-fapiv3-solana-futures).
+
 request:
 
 ```shell
@@ -594,6 +710,8 @@ response:
 > Note: `hash` is not the transaction hash; it is just a unique identifier.
 
 ## **withdraw by API \[solana\] \[spot\]**
+
+> **Deprecated:** This V1 interface will be discontinued in the future. Please migrate to the [V3 version](#withdraw-by-fapiv3-solana-spot).
 
 request:
 

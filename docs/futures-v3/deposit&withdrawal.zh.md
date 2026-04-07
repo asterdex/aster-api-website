@@ -165,6 +165,8 @@ curl 'https://fapi5.asterdex.com/fapi/v3/time'
 
 ## **查询用户提现信息**
 
+> **已废弃：** 该 V1 接口将在未来停止服务，请迁移至 [V3 版本](#查询用户提现信息v3)。
+
 * 注意：请参照 [API-KEY 签名（V1）](#api-key-签名v1) 说明生成请求签名。
 
 请求：
@@ -226,6 +228,8 @@ curl --location --request POST 'https://fapi.asterdex.com/fapi/aster/user-withdr
 
 ## **查询充值提现历史**
 
+> **已废弃：** 该 V1 接口将在未来停止服务，请迁移至 [V3 版本](#查询充值提现历史v3)。
+
 * 注意：请参照 [API-KEY 签名（V1）](#api-key-签名v1) 说明生成请求签名。
 
 请求：
@@ -238,6 +242,112 @@ curl --location --request POST 'https://fapi.asterdex.com/fapi/aster/deposit-wit
 参数：
 
 除标准 V1 签名参数（`timestamp`、`recvWindow`、`signature`）外，无需其他参数。
+
+响应：
+
+```json
+[
+    {
+        "id": "1234567",
+        "type": "DEPOSIT",
+        "asset": "USDT",
+        "amount": "100",
+        "state": "SUCCESS",
+        "txHash": "0x9a40f0119b670fb6b155744b51981f91c4c4c8a20c333441a63853fe7d055c90",
+        "time": 1742198400000,
+        "chainId": 56,
+        "accountType": "spot"
+    }
+]
+```
+
+| 字段        | 说明                                          |
+|-------------|-----------------------------------------------|
+| id          | 记录 ID                                       |
+| type        | 记录类型：`DEPOSIT`（充值）或 `WITHDRAW`（提现）|
+| asset       | 资产名称，如 USDT                             |
+| amount      | 数量                                          |
+| state       | 状态：`PROCESSING`、`SUCCESS` 或 `FAILED`     |
+| txHash      | 链上交易哈希                                  |
+| time        | 记录时间（Unix 毫秒时间戳）                   |
+| chainId     | 链 ID                                         |
+| accountType | 账户类型：`spot`（现货）或 `perp`（合约）     |
+
+## **查询用户提现信息\[v3\]**
+
+* 注意：请参照 [Pro API-KEY 签名（V3）](#pro-api-key-签名v3) 说明生成请求签名，以下示例仅包含该接口特有参数。
+
+请求：
+
+```shell
+curl --location --request POST 'https://fapi.asterdex.com/fapi/v3/aster/user-withdraw-info' \
+  --header 'Content-Type: application/json'
+```
+
+参数：
+
+除标准 V3 签名参数外，无需其他参数。
+
+响应：
+
+```json
+{
+    "userDailyLimit": "10000",
+    "userRemainingDailyLimit": "9000",
+    "totalDailyLimit": "1000000",
+    "totalRemainingDailyLimit": "980000",
+    "balances": {
+        "USDT": {
+            "currency": "USDT",
+            "spotTotalWithdrawAmount": "500",
+            "perpTotalWithdrawAmount": "300",
+            "dailyLimit": "9000",
+            "chainBalances": {
+                "56": {
+                    "chainId": 56,
+                    "spotMaxWithdrawAmount": "500",
+                    "perpMaxWithdrawAmount": "300",
+                    "chainLimit": "800",
+                    "withdrawFee": "0.5"
+                }
+            }
+        }
+    }
+}
+```
+
+| 字段                                         | 说明                                         |
+|----------------------------------------------|----------------------------------------------|
+| userDailyLimit                               | 用户每日提现限额（以 USD 计）                |
+| userRemainingDailyLimit                      | 用户今日剩余提现限额（以 USD 计）            |
+| totalDailyLimit                              | 平台每日提现总限额（以 USD 计）              |
+| totalRemainingDailyLimit                     | 平台今日剩余提现总限额（以 USD 计）          |
+| balances                                     | 非零余额资产映射，以资产名称为键             |
+| balances.currency                            | 资产名称                                     |
+| balances.spotTotalWithdrawAmount             | 现货账户可提现总余额                         |
+| balances.perpTotalWithdrawAmount             | 合约账户可提现总余额                         |
+| balances.dailyLimit                          | 该资产今日剩余提现限额（以 USD 计）          |
+| balances.chainBalances                       | 各链余额信息，以链 ID 为键                   |
+| balances.chainBalances.chainId               | 链 ID                                        |
+| balances.chainBalances.spotMaxWithdrawAmount | 该链现货账户最大可提现数量                   |
+| balances.chainBalances.perpMaxWithdrawAmount | 该链合约账户最大可提现数量                   |
+| balances.chainBalances.chainLimit            | 该链最大可提现数量                           |
+| balances.chainBalances.withdrawFee           | 该链提现手续费                               |
+
+## **查询充值提现历史\[v3\]**
+
+* 注意：请参照 [Pro API-KEY 签名（V3）](#pro-api-key-签名v3) 说明生成请求签名，以下示例仅包含该接口特有参数。
+
+请求：
+
+```shell
+curl --location --request POST 'https://fapi.asterdex.com/fapi/v3/aster/deposit-withdraw-history' \
+  --header 'Content-Type: application/json'
+```
+
+参数：
+
+除标准 V3 签名参数外，无需其他参数。
 
 响应：
 
@@ -488,6 +598,8 @@ const userSignature = bs58.encode(signatureBytes);
 
 ### 通过 fapi 提现 \[evm\] \[futures\]
 
+> **已废弃：** 该 V1 接口将在未来停止服务，请迁移至 [V3 版本](#通过-fapiv3-提现-evm-futures)。
+
 * 注意：请参照 [API-KEY 签名（V1）](#api-key-签名v1) 说明生成请求签名，以下示例仅包含该接口特有参数。
 
 请求：
@@ -526,6 +638,8 @@ curl --location --request POST 'https://fapi.asterdex.com/fapi/aster/user-withdr
 
 ### 通过 API 提现 \[evm\] \[spot\]
 
+> **已废弃：** 该 V1 接口将在未来停止服务，请迁移至 [V3 版本](#通过-fapiv3-提现-evm-spot)。
+
 请求：
 
 ```shell
@@ -562,6 +676,8 @@ curl --location --request POST 'https://sapi.asterdex.com/api/v1/aster/user-with
 
 ### 通过 fapi 提现 \[solana\] \[futures\]
 
+> **已废弃：** 该 V1 接口将在未来停止服务，请迁移至 [V3 版本](#通过-fapiv3-提现-solana-futures)。
+
 请求：
 
 ```shell
@@ -594,6 +710,8 @@ curl --location --request POST 'https://fapi.asterdex.com/fapi/aster/user-solana
 > 注意：`hash` 不是交易哈希，仅为唯一标识符。
 
 ### 通过 API 提现 \[solana\] \[spot\]
+
+> **已废弃：** 该 V1 接口将在未来停止服务，请迁移至 [V3 版本](#通过-fapiv3-提现-solana-spot)。
 
 请求：
 
