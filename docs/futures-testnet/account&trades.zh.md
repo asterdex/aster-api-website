@@ -218,6 +218,58 @@ Type                 |           强制要求的参数
 	* 双开模式下,`LONG`方向上不支持`BUY`; `SHORT` 方向上不支持`SELL`
 
 
+## **修改订单 (TRADE)**
+
+> **响应:**
+
+```javascript
+{ 
+	'orderId': 405,  //订单号
+	'symbol': 'GOOGLUSDT', //交易对
+	'status': 'NEW', //订单状态
+	'clientOrderId': 'uOLCC3aiCou3z2YL0sxWIX',  //用户自定义的订单号
+	'price': '295.50',  //委托价格
+	'avgPrice': '0.00000', // 平均成交价
+	'origQty': '0.150',  // 原始委托数量
+	'executedQty': '0', // 成交量
+	'cumQty': '0', 
+	'cumQuote': '0',  // 成交金额
+	'timeInForce': 'GTC',  // 有效方法
+	'type': 'LIMIT',  // 订单类型
+	'reduceOnly': False,  // 仅减仓
+	'closePosition': False,  // 是否条件全平仓
+	'side': 'BUY',   //买卖方向
+	'positionSide': 'BOTH',   // 持仓方向
+	'stopPrice': '0',  // 触发价，对`TRAILING_STOP_MARKET`无效
+	'workingType': 'CONTRACT_PRICE',  // 条件价格触发类型
+	'priceProtect': False,  // 是否开启条件单触发保护
+	'origType': 'LIMIT',  // 触发前订单类型
+	'updateTime': 1776311274450 //更新时间
+}
+```
+
+``
+PUT /fapi/v3/order ``
+
+**权重:**
+1
+
+**参数:**
+
+名称 | 类型 | 是否必需 | 描述
+---------------- | ------- | -------- | ----
+orderId | LONG | NO |系统订单号
+origClientOrderId | STRING | NO | 用户自定义的订单号
+symbol | STRING | YES| 交易对
+quantity | DECIMAL| NO | 下单数量
+price | DECIMAL | NO | 委托价格
+
+* orderId 与 origClientOrderId 必须至少发送一个，同时发送则以 order id为准
+* quantity 与 price 均必须发送
+* 当新订单的quantity 或 price不满足PRICE_FILTER / PERCENT_FILTER / LOT_SIZE限制，修改会被拒绝，原订单依旧被保留
+订单只支持limit类型
+* 同一订单修改次数最多10000次
+
 ## **批量下单 (TRADE)**
 
 
@@ -1728,6 +1780,7 @@ toAccountAddress={toAccountAddress}&asset={asset}&amount={amount}&kindType={kind
 | 母账户 → 子账户 | 母账户地址 | *(无需传入)* | 母账户钱包私钥 |
 | 子账户 → 母账户 | 子账户地址 | *(无需传入)* | 子账户钱包私钥 |
 | 子账户 A → 子账户 B | 母账户地址 | 子账户 A 地址 | 母账户钱包私钥 |
+| 子账户 A → 子账户 B | 子账户地址 | *(无需传入)* | 子账户钱包私钥 |
 
 ---
 
@@ -1735,6 +1788,6 @@ toAccountAddress={toAccountAddress}&asset={asset}&amount={amount}&kindType={kind
 
 * `signature` **必须使用 `user` 账户的钱包私钥签名**，不可使用 signer 私钥替代。
 * `user` 字段必须与签名所用私钥对应的地址一致。
-* 使用**子账户私钥**签名时，仅支持向**母账户**划转；子→子划转必须由母账户签名。
+* 使用**子账户私钥**签名时，支持向**母账户**划转；也支持子→子划转,此时转账的来源地址为签名的**子账户**
 * 向**已冻结的子账户**划转或从**已冻结的子账户**划出均会失败。
 * 不支持向**非子账户关系内的外部地址**划转。
