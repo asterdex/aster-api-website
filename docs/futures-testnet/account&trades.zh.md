@@ -171,6 +171,9 @@ timeInForce      | ENUM    | NO       | 有效方法
 workingType      | ENUM    | NO       | stopPrice 触发类型: `MARK_PRICE`(标记价格), `CONTRACT_PRICE`(合约最新价). 默认 `CONTRACT_PRICE`
 priceProtect | STRING | NO | 条件单触发保护："TRUE","FALSE", 默认"FALSE". 仅 `STOP`, `STOP_MARKET`, `TAKE_PROFIT`, `TAKE_PROFIT_MARKET` 需要此参数
 newOrderRespType | ENUM    | NO       | "ACK", "RESULT", 默认 "ACK"
+pegPriceType     | ENUM    | NO       | BBO peg 模式: `COUNTERPARTY_1` 或 `QUEUE_1`。在 `LIMIT` 订单上设置此参数后，撮合引擎在触发时基于订单簿的 BBO 加 `pegOffset` 解析实际价格。默认不使用 peg。
+pegOffset        | DECIMAL | NO       | 当 `pegPriceType` 已设置时，相对 BBO 的有符号偏移量。买单应为非正值（如 `-0.5`），卖单为非负值。单位与 `price` 相同，必须是 `tickSize` 的倍数。
+priceLimit       | DECIMAL | NO       | BBO peg 订单的绝对价格上下限。买单：上限——peg 不会高于此；卖单：下限。必须 > 0 且为 `tickSize` 倍数。默认无限制。
 
 根据 order `type`的不同，某些参数强制要求，具体如下:
 
@@ -269,6 +272,79 @@ price | DECIMAL | NO | 委托价格
 * 当新订单的quantity 或 price不满足PRICE_FILTER / PERCENT_FILTER / LOT_SIZE限制，修改会被拒绝，原订单依旧被保留
 订单只支持limit类型
 * 同一订单修改次数最多10000次
+* **BBO peg 订单**（使用 `pegPriceType` = `COUNTERPARTY_1` / `QUEUE_1` 下的订单）：撮合引擎在触发时从订单簿解析实际价格。普通 modify 无法改变 peg 解析后的价格。若需要持续追踪 BBO，请使用追单接口 `POST /fapi/v3/chase`。
+
+## **追单 (TRADE)**
+
+> **响应:**
+
+```javascript
+{
+    "strategyId": 12345,
+    "clientStrategyId": "my_chase_1",
+    "symbol": "BTCUSDT",
+    "side": "BUY",
+    "positionSide": "BOTH",
+    "quantity": "0.1",
+    "quantityUnit": "BASE",
+    "reduceOnly": false,
+    "chaseOffset": "0.5",
+    "chaseOffsetType": "ABSOLUTE",
+    "maxChaseOffset": "10.0",
+    "maxChaseOffsetType": "ABSOLUTE",
+    "priceLimit": "50100.00",
+    "timeInForce": "GTX",
+    "strategyStatus": "NEW",
+    "bookTime": 1747728000000,
+    "updateTime": 1747728000000
+}
+```
+
+``POST /fapi/v3/chase``
+
+下一笔**追单策略订单** —— BBO peg GTX 限价单，自动跟随最优买/卖价重新挂单。策略服务每个 tick 轮询订单簿，实时修改委托价格，使订单保持在盘口前列，直到成交或市场偏离原始 BBO 超过 `maxChaseOffset`。
+
+**权重:** 1
+
+**参数:**
+
+| 名称               | 类型    | 是否必需   | 描述                                                                                                                                                              |
+| ------------------ | ------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| symbol             | STRING  | YES        | 交易对。                                                                                                                                                          |
+| side               | ENUM    | YES        | `BUY` 或 `SELL`。缺失/空值返回 `"Mandatory parameter 'side' was not sent, was empty/null, or malformed."`                                                          |
+| positionSide       | ENUM    | NO         | 单向持仓模式默认 `BOTH`；双向持仓模式必须传 `LONG` 或 `SHORT`。                                                                                                    |
+| quantityUnit       | STRING  | YES        | `BASE`（数量以标的资产计价，如 BTC）或 `QUOTE`（数量以计价资产计价，如 USDT）。`QUOTE` 时系统按 mark price 换算到 BASE。                                              |
+| quantity           | DECIMAL | YES        | 数量，单位由 `quantityUnit` 决定。                                                                                                                                |
+| reduceOnly         | STRING  | NO         | `"true"` 或 `"false"`（大小写不敏感）。任何其他值会被拒绝。默认 `"false"`。                                                                                        |
+| chaseOffset        | DECIMAL | NO         | 距 BBO 的偏移量。默认 `"0"`（完全贴近 BBO）。必须 ≥ 0 且为 `tickSize` 的倍数。买单价 = `bid1 − chaseOffset`；卖单价 = `ask1 + chaseOffset`。                          |
+| chaseOffsetType    | STRING  | NO         | `ABSOLUTE`（默认）。v1 仅支持 `ABSOLUTE`。`PERCENTAGE` 后续支持。                                                                                                  |
+| maxChaseOffset     | DECIMAL | NO         | 相对原始 BBO 允许偏移的最大距离，超出后追单自动撤销。当 `maxChaseOffsetType` 已传时必填。必须 > 0。                                                                  |
+| maxChaseOffsetType | STRING  | NO         | `ABSOLUTE` 或 `PERCENTAGE`（默认 `ABSOLUTE`）。`ABSOLUTE`：同价格单位，必须为 `tickSize` 倍数；`PERCENTAGE`：≤ 2 位小数。                                            |
+| priceLimit         | DECIMAL | NO         | 绝对价格上下限。买单：上限（追单不会高于此）；卖单：下限。必须 > 0 且为 `tickSize` 倍数。                                                                            |
+| timeInForce        | ENUM    | NO         | 默认 `GTX`（post-only）。**不允许 `NO_FILL`**，否则返回 `INVALID_TIF`。                                                                                            |
+| clientStrategyId   | STRING  | NO         | 用户自定义策略 id。未传则自动生成。**长度 ≤ 28 字符**（DB 字段为 `varchar(28)`）。须满足 `^[\.A-Z\:/a-z0-9_-]{1,28}$`。                                              |
+| recvWindow         | LONG    | NO         |                                                                                                                                                                  |
+| timestamp          | LONG    | YES        |                                                                                                                                                                  |
+
+**校验规则:**
+
+* `side` 必填。
+* `reduceOnly` 仅接受 `"true"` / `"false"`（大小写不敏感）。其他值返回 `INVALID_PARAMETER`，参数名为 `reduceOnly`。
+* `chaseOffset` 必须 ≥ 0 且为 `tickSize` 倍数。
+* `chaseOffsetType` / `maxChaseOffsetType` 必须为 `ABSOLUTE` 或 `PERCENTAGE`；非法值返回 `INVALID_PARAMETER`（不再误用 `INVALID_CHASE_OFFSET`）。
+* `maxChaseOffsetType = PERCENTAGE` 时，输入值小数位数 ≤ 2（线上以 ×100 存储，如 `"1"` → 1.00%，`"100"` → 100.00%）。
+* `maxChaseOffsetType = ABSOLUTE` 时，`maxChaseOffset` 必须为 `tickSize` 倍数。
+* `timeInForce` 不允许 `NO_FILL`。
+* `clientStrategyId` 长度必须 ≤ 28 字符。
+* OI cap 校验：`quantityUnit = QUOTE` 时按 mark price 换算到 BASE 数量进行 symbol-leverage OI 档位校验，公式 `qtyBase = qtyQuote × 10^quantityDecimal / markPrice`。
+
+**行为:**
+
+* 初始订单以 GTX（post-only）LIMIT 形式发出，`pegPriceType = QUEUE_1`、`pegOffset` 取符号（买单为负，卖单为正）。
+* 策略服务每秒轮询，将订单价格修改为 `bid1 − chaseOffset`（买单）或 `ask1 + chaseOffset`（卖单），跟随 BBO 移动。
+* 当市场偏移超过 `maxChaseOffset` 时**自动撤销**，原因为 `OFFSET_CANCELLED`。
+* 新的 peg 价若会突破 `priceLimit`，追单将 clamp 在 `priceLimit` 并在该方向停止继续追价。
+* 追单在以下情形终止：成交、用户撤单（`DELETE /fapi/v3/order`）、`maxChaseOffset` 触发、`priceLimit` clamp 且无新的优化空间。
 
 ## **批量下单 (TRADE)**
 
@@ -1873,3 +1949,92 @@ toAccountAddress={toAccountAddress}&asset={asset}&amount={amount}&kindType={kind
 
 * `batchId` 为必传参数，每个 `batchId` 对应一次迁移批次。
 * 查询结果仅限当前认证用户——只返回与该账户相关的迁移记录。
+
+## **注册并授权 Agent (PUBLIC)**
+
+> **响应:**
+
+```javascript
+{
+    "code": 200,
+    "msg": "success"
+}
+```
+
+`POST /fapi/v3/registerAndApproveAgent`
+
+注册新的 API Agent 账户并一次性授予其交易/提现权限。Agent 授权后，可使用 API Key 在指定权限范围内代表用户进行操作。
+
+**权重:** 50
+
+**参数:**
+
+| 名称 | 类型 | 是否必需 | 描述 |
+|------|------|---------|------|
+| user | STRING | YES | 用户钱包地址 |
+| nonce | LONG | YES | 微秒级时间戳，用于防重放攻击 |
+| agentName | STRING | YES | Agent 的显示名称 |
+| agentAddress | STRING | YES | Agent 的钱包地址 |
+| expired | LONG | YES | Agent 到期时间戳（毫秒） |
+| signatureChainId | LONG | YES | 生成签名时所使用的链 ID（EVM 地址填 `56`，Solana 地址填 `101`） |
+| signature | STRING | YES | 对消息体的签名，必须使用用户钱包私钥签名（见下方签名说明） |
+| canSpotTrade | BOOLEAN | YES | 是否允许 Agent 下现货订单 |
+| canPerpTrade | BOOLEAN | YES | 是否允许 Agent 下永续合约订单 |
+| canWithdraw | BOOLEAN | YES | 是否允许 Agent 发起提现 |
+| ipWhitelist | STRING | NO | 允许访问的 IP 地址或 CIDR 段列表，以**空格**分隔（如 `192.168.1.1 10.0.0.0/24`）。**当 `canWithdraw` 为 `true` 时必填，不可为空。** |
+| agentCode | STRING | NO | Agent 注册邀请码 |
+
+---
+
+### 签名说明
+
+使用**用户钱包私钥**对以下消息体签名：
+
+```
+msg: user={user}&nonce={nonce}&agentName={agentName}&agentAddress={agentAddress}&expired={expired}&signatureChainId={signatureChainId}&canSpotTrade={canSpotTrade}&canPerpTrade={canPerpTrade}&canWithdraw={canWithdraw}&ipWhitelist={ipWhitelist}
+```
+
+> **EVM 地址专用：** 将上述 `msg` 字符串作为 EIP-712 结构化数据中 `message.msg` 的值进行签名，结构如下：
+
+```
+typed_data = {
+  "types": {
+    "EIP712Domain": [
+      {"name": "name", "type": "string"},
+      {"name": "version", "type": "string"},
+      {"name": "chainId", "type": "uint256"},
+      {"name": "verifyingContract", "type": "address"}
+    ],
+    "Message": [
+      { "name": "msg", "type": "string" }
+    ]
+  },
+  "primaryType": "Message",
+  "domain": {
+    "name": "AsterSignTransaction",
+    "version": "1",
+    "chainId": 714,
+    "verifyingContract": "0x0000000000000000000000000000000000000000"
+  },
+  "message": {
+    "msg": "$msg"
+  }
+}
+```
+
+#### 支持的签名算法
+
+| 账户类型 | 签名算法 | 编码格式 |
+|---|---|---|
+| EVM 地址 | EIP-712 Typed Data（chainId=56，message.msg=消息体） | Hex |
+| Solana 地址 | Ed25519 | Base58 |
+
+---
+
+### 注意事项
+
+* `nonce` 必须为微秒精度时间戳，与服务器时间差不得超过 **10 秒**，且同一 nonce 不可重复使用。
+* `expired` 为 Agent 的有效期截止时间，单位为**毫秒**，超时后 Agent 将自动失效。
+* `ipWhitelist` 以**空格**作为分隔符，支持 CIDR 格式（如 `192.168.1.1 10.0.0.0/24`）。**当 `canWithdraw` 为 `true` 时，`ipWhitelist` 必填且不可为空。**
+* 本接口**无需鉴权**——无需传入 API Key 或 HMAC 请求头，所有授权均通过链上 `signature` 验证。
+* 本接口将 Agent 注册与权限授予合并为单次调用，等同于独立注册接口与 `approveAgent` 接口的组合操作。

@@ -2,7 +2,7 @@
 
 Aster API already provides developers with complete example demos (including runnable code and call examples):
 
-- **Endpoint Demo:** <https://github.com/asterdex/API-demo>
+- **Endpoint Demo:** <https://github.com/asterdex/API-demo>,<https://github.com/asterdex/api-docs/tree/master/demo>
 
 - **Aster Code Frontend Demo:** <https://github.com/jupiter-hongc/aster-code-builder-demo>
 

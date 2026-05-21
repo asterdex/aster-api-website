@@ -2,7 +2,7 @@
 
 Aster API 已为开发者提供完整的示例 Demo（含可直接运行的代码与调用示范）：
 
-- **接口 Demo:** <https://github.com/asterdex/API-demo>
+- **接口 Demo:** <https://github.com/asterdex/API-demo>,<https://github.com/asterdex/api-docs/tree/master/demo>
 
 - **Aster Code 前端 Demo:** <https://github.com/jupiter-hongc/aster-code-builder-demo>
 
