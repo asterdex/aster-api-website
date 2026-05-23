@@ -60,6 +60,7 @@ plugins:
             Spot Testnet: 现货测试网
             Spot V3: 现货 V3
             RPC: 链上 RPC
+            Aster Chain: Aster Chain
             Aster Code: Aster Code
             Integration Flow: 对接流程
             Authentication: 鉴权方式
@@ -123,6 +124,9 @@ nav:
       - General Info: rpc/general-info.md
       - Endpoints: rpc/endpoints.md
 
+  - Aster Chain:
+      - Endpoints: aster-chain/endpoints.md
+
   - Futures Testnet:
       - General Info: futures-testnet/general-info.md
       - Market Data: futures-testnet/market-data.md
@@ -143,6 +147,7 @@ nav:
 
   - Changelog: 
       - Upcoming Changes: changelog/upcoming-changes.md
+      - 2026-5-22: changelog/2026-5-22.md
       - 2026-5-20: changelog/2026-5-20.md
       - 2026-5-12: changelog/2026-5-12.md
       - 2026-5-11: changelog/2026-5-11.md
