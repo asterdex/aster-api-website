@@ -331,6 +331,12 @@ if __name__ == '__main__':
 * ACK
 * RESULT
 
+**自成交防止模式 (stpMode)**
+
+* EXPIRE_TAKER 撤销taker订单
+* EXPIRE_MAKER 撤销maker订单
+* EXPIRE_BOTH 同时撤销双方订单
+
 **K线间隔:**
 
 m -> 分钟; h -> 小时; d -> 天; w -> 周; M -> 月

@@ -337,6 +337,12 @@ if __name__ == '__main__':
 * ACK
 * RESULT
 
+**STP Mode (stpMode)**
+
+* EXPIRE_TAKER
+* EXPIRE_MAKER
+* EXPIRE_BOTH
+
 **Kline/Candlestick chart intervals:**
 
 m -> minutes; h -> hours; d -> days; w -> weeks; M -> months
