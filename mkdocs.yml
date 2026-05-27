@@ -60,6 +60,7 @@ plugins:
             Spot Testnet: 现货测试网
             Spot V3: 现货 V3
             RPC: 链上 RPC
+            Prediction Testnet: 预测市场测试网
             Aster Chain: Aster Chain
             Aster Code: Aster Code
             Integration Flow: 对接流程
@@ -143,10 +144,19 @@ nav:
       - WebSocket Account Info: spot-testnet/websocket-account-info.md
       - Error Codes: spot-testnet/error-codes.md
 
+  - Prediction Testnet:
+      - General Info: prediction-testnet/general-info.md
+      - Market Data: prediction-testnet/market-data.md
+      - Spot Account & Trading: prediction-testnet/account&trades.md
+      - WebSocket Market Data: prediction-testnet/websocket-market-streams.md
+      - WebSocket Account Info: prediction-testnet/user-data-streams.md
+      - Error Codes: prediction-testnet/error-codes.md
+
   - Demo: demo/demo.md
 
   - Changelog: 
       - Upcoming Changes: changelog/upcoming-changes.md
+      - 2026-5-26: changelog/2026-5-26.md
       - 2026-5-22: changelog/2026-5-22.md
       - 2026-5-21: changelog/2026-5-21.md
       - 2026-5-20: changelog/2026-5-20.md
