@@ -96,13 +96,13 @@ nav:
       - Deposit & Withdrawal: futures-v3/deposit&withdrawal.md
       - Error Codes: futures-v3/error-codes.md
       
-  - Futures: 
-      - General Info: futures/general-info.md
-      - Market Data: futures/market-data.md
-      - Futures Account & Trading: futures/account&trades.md
-      - WebSocket Market Data: futures/websocket-market-streams.md
-      - WebSocket Account Info: futures/user-data-streams.md
-      - Error Codes: futures/error-codes.md
+  # - Futures: 
+  #     - General Info: futures/general-info.md
+  #     - Market Data: futures/market-data.md
+  #     - Futures Account & Trading: futures/account&trades.md
+  #     - WebSocket Market Data: futures/websocket-market-streams.md
+  #     - WebSocket Account Info: futures/user-data-streams.md
+  #     - Error Codes: futures/error-codes.md
 
   - Spot V3:
       - General Info: spot-v3/general-info.md
@@ -111,13 +111,13 @@ nav:
       - WebSocket Market Data: spot-v3/websocket-market-streams.md
       - WebSocket Account Info: spot-v3/websocket-account-info.md
 
-  - Spot: 
-      - Overview: spot/spot-api-overview.md
-      - Market Data: spot/market-data-api.md
-      - Spot Account & Trading: spot/spot-account-and-trading-api.md
-      - WebSocket Market Data: spot/websocket-market-data.md
-      - WebSocket Account Info: spot/websocket-account-info.md
-      - Error Codes: spot/error-codes.md
+  # - Spot: 
+  #     - Overview: spot/spot-api-overview.md
+  #     - Market Data: spot/market-data-api.md
+  #     - Spot Account & Trading: spot/spot-account-and-trading-api.md
+  #     - WebSocket Market Data: spot/websocket-market-data.md
+  #     - WebSocket Account Info: spot/websocket-account-info.md
+  #     - Error Codes: spot/error-codes.md
 
   - Aster Code: 
       - Integration Flow: asterCode/integration-flow.md
@@ -163,6 +163,7 @@ nav:
 
   - Changelog: 
       - Upcoming Changes: changelog/upcoming-changes.md
+      - 2026-6-17: changelog/2026-6-17.md
       - 2026-6-2: changelog/2026-6-2.md
       - 2026-5-26: changelog/2026-5-26.md
       - 2026-5-22: changelog/2026-5-22.md
