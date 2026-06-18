@@ -227,7 +227,6 @@ priceProtect | STRING | NO | 条件单触发保护："TRUE","FALSE", 默认"FALS
 newOrderRespType | ENUM    | NO       | "ACK", "RESULT", 默认 "ACK"
 pegPriceType     | ENUM    | NO       | BBO peg 模式: `COUNTERPARTY_1` 或 `QUEUE_1`。在 `LIMIT` 订单上设置此参数后，撮合引擎在触发时基于订单簿的 BBO 加 `pegOffset` 解析实际价格。默认不使用 peg。
 pegOffset        | DECIMAL | NO       | 当 `pegPriceType` 已设置时，相对 BBO 的有符号偏移量。买单应为非正值（如 `-0.5`），卖单为非负值。单位与 `price` 相同，必须是 `tickSize` 的倍数。
-priceLimit       | DECIMAL | NO       | BBO peg 订单的绝对价格上下限。买单：上限——peg 不会高于此；卖单：下限。必须 > 0 且为 `tickSize` 倍数。默认无限制。
 stpMode          | ENUM    | NO       | 本订单的自成交防止（STP）模式，覆盖账户级默认设置。`EXPIRE_TAKER`：撤销taker订单；`EXPIRE_MAKER`：撤销maker订单；`EXPIRE_BOTH`：同时撤销双方订单。
 
 根据 order `type`的不同，某些参数强制要求，具体如下:
@@ -347,7 +346,6 @@ price | DECIMAL | NO | 委托价格
     "chaseOffsetType": "ABSOLUTE",
     "maxChaseOffset": "10.0",
     "maxChaseOffsetType": "ABSOLUTE",
-    "priceLimit": "50100.00",
     "timeInForce": "GTX",
     "strategyStatus": "NEW",
     "bookTime": 1747728000000,
@@ -373,9 +371,8 @@ price | DECIMAL | NO | 委托价格
 | reduceOnly         | STRING  | NO         | `"true"` 或 `"false"`（大小写不敏感）。任何其他值会被拒绝。默认 `"false"`。                                                                                        |
 | chaseOffset        | DECIMAL | NO         | 距 BBO 的偏移量。默认 `"0"`（完全贴近 BBO）。必须 ≥ 0 且为 `tickSize` 的倍数。买单价 = `bid1 − chaseOffset`；卖单价 = `ask1 + chaseOffset`。                          |
 | chaseOffsetType    | STRING  | NO         | `ABSOLUTE`（默认）。v1 仅支持 `ABSOLUTE`。`PERCENTAGE` 后续支持。                                                                                                  |
-| maxChaseOffset     | DECIMAL | NO         | 相对原始 BBO 允许偏移的最大距离，超出后追单自动撤销。当 `maxChaseOffsetType` 已传时必填。必须 > 0。                                                                  |
+| maxChaseOffset     | DECIMAL | NO         | 相对原始 BBO 允许偏移的最大距离，超出后追单自动撤销。必须 > 0。若不传，则不应用基于距离的自动撤销，且所传的 `maxChaseOffsetType` 将被忽略。                          |
 | maxChaseOffsetType | STRING  | NO         | `ABSOLUTE` 或 `PERCENTAGE`（默认 `ABSOLUTE`）。`ABSOLUTE`：同价格单位，必须为 `tickSize` 倍数；`PERCENTAGE`：≤ 2 位小数。                                            |
-| priceLimit         | DECIMAL | NO         | 绝对价格上下限。买单：上限（追单不会高于此）；卖单：下限。必须 > 0 且为 `tickSize` 倍数。                                                                            |
 | timeInForce        | ENUM    | NO         | 默认 `GTX`（post-only）。**不允许 `NO_FILL`**，否则返回 `INVALID_TIF`。                                                                                            |
 | clientStrategyId   | STRING  | NO         | 用户自定义策略 id。未传则自动生成。**长度 ≤ 28 字符**（DB 字段为 `varchar(28)`）。须满足 `^[\.A-Z\:/a-z0-9_-]{1,28}$`。                                              |
 | recvWindow         | LONG    | NO         |                                                                                                                                                                  |
@@ -387,6 +384,8 @@ price | DECIMAL | NO | 委托价格
 * `reduceOnly` 仅接受 `"true"` / `"false"`（大小写不敏感）。其他值返回 `INVALID_PARAMETER`，参数名为 `reduceOnly`。
 * `chaseOffset` 必须 ≥ 0 且为 `tickSize` 倍数。
 * `chaseOffsetType` / `maxChaseOffsetType` 必须为 `ABSOLUTE` 或 `PERCENTAGE`；非法值返回 `INVALID_PARAMETER`（不再误用 `INVALID_CHASE_OFFSET`）。
+* `chaseOffsetType` 目前仅支持 `ABSOLUTE`。`PERCENTAGE` 为合法值，但 `chaseOffset` 尚未实现，返回 `UNSUPPORTED_OPERATION`。（`maxChaseOffsetType` 两者均支持。）
+* 数量 / 名义价值下限（仅开仓单；`reduceOnly` 单豁免名义价值下限）：`quantityUnit = BASE` 时，`quantity` 必须 ≥ 交易对 `marketMinQty`（否则 `QTY_LESS_THAN_MIN_QTY`），且 `quantity × markPrice` 必须 ≥ 交易对 `minNotional`（否则 `MIN_NOTIONAL`）；`quantityUnit = QUOTE` 时，计价金额必须 ≥ `minNotional`（否则 `MIN_NOTIONAL`），且 `quoteQty / markPrice` 必须 ≥ `marketMinQty`（否则 `QTY_LESS_THAN_MIN_QTY`）。
 * `maxChaseOffsetType = PERCENTAGE` 时，输入值小数位数 ≤ 2（线上以 ×100 存储，如 `"1"` → 1.00%，`"100"` → 100.00%）。
 * `maxChaseOffsetType = ABSOLUTE` 时，`maxChaseOffset` 必须为 `tickSize` 倍数。
 * `timeInForce` 不允许 `NO_FILL`。
@@ -398,8 +397,7 @@ price | DECIMAL | NO | 委托价格
 * 初始订单以 GTX（post-only）LIMIT 形式发出，`pegPriceType = QUEUE_1`、`pegOffset` 取符号（买单为负，卖单为正）。
 * 策略服务每秒轮询，将订单价格修改为 `bid1 − chaseOffset`（买单）或 `ask1 + chaseOffset`（卖单），跟随 BBO 移动。
 * 当市场偏移超过 `maxChaseOffset` 时**自动撤销**，原因为 `OFFSET_CANCELLED`。
-* 新的 peg 价若会突破 `priceLimit`，追单将 clamp 在 `priceLimit` 并在该方向停止继续追价。
-* 追单在以下情形终止：成交、用户撤单（`DELETE /fapi/v3/order`）、`maxChaseOffset` 触发、`priceLimit` clamp 且无新的优化空间。
+* 追单在以下情形终止：成交、用户撤单（`DELETE /fapi/v3/order`）、`maxChaseOffset` 触发。
 
 ## **批量下单 (TRADE)**
 
@@ -1968,17 +1966,41 @@ toAccountAddress={toAccountAddress}&asset={asset}&amount={amount}&kindType={kind
 ```javascript
 {
     "batchId": "a1B2c3D4e5F6g7H8i9J0k1",
-    "fromUserId": 12345678,
-    "toUserId": 87654321,
-    "status": "SUCCESS",            // 迁移状态
-    "items": [
+    "totalCount": 2,                    // 总条数
+    "successCount": 1,                  // 成功条数（status=S）
+    "processingCount": 0,               // 处理中条数（status=P）
+    "failCount": 0,                     // 失败条数（status=F）
+    "initCount": 1,                     // 待执行条数（status=I）
+    "details": [
         {
-            "asset": "USDT",
-            "amount": "500.00000000"
+            "id": 1001,
+            "fromUserId": 12345678,     // 转出用户ID
+            "toUserId": 87654321,       // 转入用户ID
+            "asset": "USDT",            // 币种
+            "amount": "500.00000000",   // 金额
+            "tranId": 9876543210,       // 划转ID（null 表示尚未处理）
+            "status": "S",              // 执行状态：I=待处理, S=划转成功, F=划转失败
+            "fromStatus": "S",          // 转出状态：S=成功, F=失败, P=处理中
+            "fromErrorCode": null,      // 转出错误码
+            "fromResponse": null,       // 转出响应信息
+            "toStatus": "S",            // 转入状态：S=成功, F=失败, P=处理中
+            "toErrorCode": null,        // 转入错误码
+            "toResponse": null          // 转入响应信息
         },
         {
+            "id": 1002,
+            "fromUserId": 12345678,
+            "toUserId": 87654321,
             "asset": "BTC",
-            "amount": "0.05000000"
+            "amount": "0.05000000",
+            "tranId": null,             // null 表示尚未处理
+            "status": "I",              // 执行状态：I=待处理, S=划转成功, F=划转失败
+            "fromStatus": null,
+            "fromErrorCode": null,
+            "fromResponse": null,
+            "toStatus": null,
+            "toErrorCode": null,
+            "toResponse": null
         }
     ]
 }

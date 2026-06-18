@@ -209,7 +209,6 @@ Send in a new order.
 | newOrderRespType | ENUM    | NO        | "ACK", "RESULT", default "ACK"                                                                                                         |
 | pegPriceType     | ENUM    | NO        | BBO peg mode: `COUNTERPARTY_1` or `QUEUE_1`. When set on a `LIMIT` order, the engine resolves the actual price from the order book at trigger time using the BBO + `pegOffset`. Defaults to no peg. |
 | pegOffset        | DECIMAL | NO        | Signed offset from BBO when `pegPriceType` is set. BUY orders should use a non-positive value (e.g. `-0.5`); SELL non-negative. Units: same scale as `price` (must be a `tickSize` multiple).        |
-| priceLimit       | DECIMAL | NO        | Absolute price cap for BBO-pegged orders. BUY: ceiling — peg never resolves above this; SELL: floor. Must be > 0 and a multiple of `tickSize`. Defaults to no cap.                                   |
 | stpMode          | ENUM    | NO        | Self-Trade Prevention mode for this order. Overrides the account-level default. `EXPIRE_TAKER`: cancel the taker side; `EXPIRE_MAKER`: cancel the maker side; `EXPIRE_BOTH`: cancel both sides.      |
 
 Additional mandatory parameters based on `type`:
@@ -329,7 +328,6 @@ price | DECIMAL | NO | Order price
     "chaseOffsetType": "ABSOLUTE",
     "maxChaseOffset": "10.0",
     "maxChaseOffsetType": "ABSOLUTE",
-    "priceLimit": "50100.00",
     "timeInForce": "GTX",
     "strategyStatus": "NEW",
     "bookTime": 1747728000000,
@@ -355,9 +353,8 @@ Place a **Chase strategy order** — a BBO-pegged GTX limit order that automatic
 | reduceOnly         | STRING  | NO        | `"true"` or `"false"` (case-insensitive). Any other value is rejected. Default `"false"`.                                                                                                  |
 | chaseOffset        | DECIMAL | NO        | Distance from BBO to peg the order. Default `"0"` (exact BBO peg). Must be ≥ 0 and a multiple of `tickSize`. BUY price = `bid1 − chaseOffset`; SELL price = `ask1 + chaseOffset`.           |
 | chaseOffsetType    | STRING  | NO        | `ABSOLUTE` (default). only supports `ABSOLUTE` for now. Will support `PERCENTAGE` later.                                                                                                   |
-| maxChaseOffset     | DECIMAL | NO        | Maximum tolerated distance from the original BBO before the chase auto-cancels. Required if `maxChaseOffsetType` is sent. Must be `> 0`.                                                   |
+| maxChaseOffset     | DECIMAL | NO        | Maximum tolerated distance from the original BBO before the chase auto-cancels. Must be `> 0`. If omitted, no distance-based auto-cancel is applied and any `maxChaseOffsetType` sent is ignored.        |
 | maxChaseOffsetType | STRING  | NO        | `ABSOLUTE` or `PERCENTAGE` (default `ABSOLUTE` when `maxChaseOffset` is sent). `ABSOLUTE`: same unit as price, must be a multiple of `tickSize`. `PERCENTAGE`: ≤ 2 decimal places.          |
-| priceLimit         | DECIMAL | NO        | Absolute price cap. BUY: ceiling — chase never crosses above this; SELL: floor. Must be > 0 and a multiple of `tickSize`.                                                                  |
 | timeInForce        | ENUM    | NO        | Default `GTX` (post-only). **`NO_FILL` is not allowed** and is rejected with `INVALID_TIF`.                                                                                                |
 | clientStrategyId   | STRING  | NO        | User-defined strategy id. Auto-generated if not sent. **Length ≤ 28 characters** (DB column is `varchar(28)`). Must match `^[\.A-Z\:/a-z0-9_-]{1,28}$`.                                    |
 
@@ -367,6 +364,8 @@ Place a **Chase strategy order** — a BBO-pegged GTX limit order that automatic
 * `reduceOnly` accepts only `"true"` / `"false"` (case-insensitive). Any other string returns `INVALID_PARAMETER` with `reduceOnly` as the offending param name.
 * `chaseOffset` must be ≥ 0 and a multiple of `tickSize`.
 * `chaseOffsetType` / `maxChaseOffsetType` must be `ABSOLUTE` or `PERCENTAGE`; an invalid value returns `INVALID_PARAMETER` (not `INVALID_CHASE_OFFSET`).
+* `chaseOffsetType` currently supports only `ABSOLUTE`. `PERCENTAGE` is a valid value but is not yet implemented for `chaseOffset` and returns `UNSUPPORTED_OPERATION`. (`maxChaseOffsetType` supports both.)
+* Quantity / notional floor (entry orders only; `reduceOnly` orders are exempt from the notional minimum): for `quantityUnit = BASE`, `quantity` must be ≥ the symbol's `marketMinQty` (else `QTY_LESS_THAN_MIN_QTY`) and `quantity × markPrice` must be ≥ the symbol's `minNotional` (else `MIN_NOTIONAL`); for `quantityUnit = QUOTE`, the quote amount must be ≥ `minNotional` (else `MIN_NOTIONAL`) and `quoteQty / markPrice` must be ≥ `marketMinQty` (else `QTY_LESS_THAN_MIN_QTY`).
 * When `maxChaseOffsetType = PERCENTAGE`, the input value must have ≤ 2 decimal places (it is stored at scale 2 on the wire, e.g. `"1"` → 1.00%, `"100"` → 100.00%).
 * When `maxChaseOffsetType = ABSOLUTE`, `maxChaseOffset` must be a multiple of `tickSize`.
 * `timeInForce` cannot be `NO_FILL`.
@@ -378,8 +377,7 @@ Place a **Chase strategy order** — a BBO-pegged GTX limit order that automatic
 * The initial order is placed as a GTX (post-only) limit with `pegPriceType = QUEUE_1` and signed `pegOffset` (negative for BUY, positive for SELL).
 * The strategy service polls every second and amends the order price as the BBO moves, keeping the order at `bid1 − chaseOffset` (BUY) or `ask1 + chaseOffset` (SELL).
 * If the market moves beyond `maxChaseOffset` from the original BBO, the chase **auto-cancels** with reason `OFFSET_CANCELLED`.
-* If the new peg price would breach `priceLimit`, the chase clamps to `priceLimit` and stops further re-pegs in that direction.
-* The chase terminates on FILL, user cancel (via standard `DELETE /fapi/v3/order`), `maxChaseOffset` breach, or `priceLimit` clamp + no further improvement opportunity.
+* The chase terminates on FILL, user cancel (via standard `DELETE /fapi/v3/order`), or `maxChaseOffset` breach.
 
 ## **Place Multiple Orders  (TRADE)**
 
@@ -2182,17 +2180,37 @@ toAccountAddress={toAccountAddress}&asset={asset}&amount={amount}&kindType={kind
 ```javascript
 {
     "batchId": "a1B2c3D4e5F6g7H8i9J0k1",
-    "fromUserId": 12345678,
-    "toUserId": 87654321,
-    "status": "SUCCESS",            // migration status
-    "items": [
+    "totalCount": 2,                    // total number of records
+    "successCount": 1,                  // number of successful records (status=S)
+    "processingCount": 0,               // number of processing records (status=P)
+    "failCount": 0,                     // number of failed records (status=F)
+    "initCount": 1,                     // number of pending records (status=I)
+    "details": [
         {
+            "id": 1001,
             "asset": "USDT",
-            "amount": "500.00000000"
+            "amount": "500.00000000",
+            "tranId": 9876543210,
+            "status": "S",              // I=pending, S=success, F=failed
+            "fromStatus": "S",          // S=success, F=failed, P=processing
+            "fromErrorCode": null,
+            "fromResponse": null,
+            "toStatus": "S",            // S=success, F=failed, P=processing
+            "toErrorCode": null,
+            "toResponse": null
         },
         {
+            "id": 1002,
             "asset": "BTC",
-            "amount": "0.05000000"
+            "amount": "0.05000000",
+            "tranId": null,             // null if not yet processed
+            "status": "I",              // I=pending, S=success, F=failed
+            "fromStatus": null,
+            "fromErrorCode": null,
+            "fromResponse": null,
+            "toStatus": null,
+            "toErrorCode": null,
+            "toResponse": null
         }
     ]
 }
@@ -2305,3 +2323,121 @@ typed_data = {
 * `ipWhitelist` uses **spaces** as the delimiter and supports CIDR notation (e.g. `192.168.1.1 10.0.0.0/24`). **`ipWhitelist` is required and must not be empty when `canWithdraw` is `true`.**
 * This endpoint is **unauthenticated** — no API Key or HMAC header is required. All authorization is verified through the on-chain `signature`.
 * This endpoint combines agent registration and permission granting into a single call, equivalent to the standalone registration step followed by `approveAgent`.
+
+---
+
+## **Get Direct Announcements (USER_DATA)**
+
+> **Response:**
+
+```javascript
+{
+  "total": 2,
+  "rows": [
+    {
+      "id": 1001,
+      "contents": [
+        {
+          "language": "en",
+          "title": "Platform Maintenance Notice",
+          "subtitle": "Scheduled downtime",
+          "content": "The platform will undergo scheduled maintenance on 2026-06-20 from 02:00 to 04:00 UTC."
+        },
+        {
+          "language": "zh",
+          "title": "平台维护公告",
+          "subtitle": "定期停机",
+          "content": "平台将于2026年6月20日UTC时间02:00至04:00进行定期维护。"
+        }
+      ],
+      "category": "MAINTENANCE",
+      "publishTime": 1750000000000,
+      "jumpLink": "https://www.asterdex.com/en/announcement/1001"
+    }
+  ]
+}
+```
+
+`GET /fapi/v3/announcement/direct`
+
+Retrieves the list of direct announcements for the authenticated user, with pagination support.
+
+**Weight:** 1
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| page | INT | NO | Page number, starting from `1`. Default: `1` |
+| size | INT | NO | Number of results per page. Default: `20` |
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| total | LONG | Total number of announcements |
+| rows | ARRAY | List of announcement objects |
+| rows[].id | LONG | Announcement ID |
+| rows[].contents | ARRAY | Multi-language content list |
+| rows[].contents[].language | STRING | Language code (e.g. `en`, `zh`) |
+| rows[].contents[].title | STRING | Announcement title |
+| rows[].contents[].subtitle | STRING | Announcement subtitle |
+| rows[].contents[].content | STRING | Announcement body text |
+| rows[].category | STRING | Announcement category |
+| rows[].publishTime | LONG | Publish timestamp (milliseconds) |
+| rows[].jumpLink | STRING | Link to the full announcement page |
+
+---
+
+## **Get Direct Announcement By ID (USER_DATA)**
+
+> **Response:**
+
+```javascript
+{
+  "id": 1001,
+  "contents": [
+    {
+      "language": "en",
+      "title": "Platform Maintenance Notice",
+      "subtitle": "Scheduled downtime",
+      "content": "The platform will undergo scheduled maintenance on 2026-06-20 from 02:00 to 04:00 UTC."
+    },
+    {
+      "language": "zh",
+      "title": "平台维护公告",
+      "subtitle": "定期停机",
+      "content": "平台将于2026年6月20日UTC时间02:00至04:00进行定期维护。"
+    }
+  ],
+  "category": "MAINTENANCE",
+  "publishTime": 1750000000000,
+  "jumpLink": "https://www.asterdex.com/en/announcement/1001"
+}
+```
+
+`GET /fapi/v3/announcement/directById`
+
+Retrieves a single direct announcement by its ID for the authenticated user.
+
+**Weight:** 1
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| id | LONG | YES | Announcement ID |
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| id | LONG | Announcement ID |
+| contents | ARRAY | Multi-language content list |
+| contents[].language | STRING | Language code (e.g. `en`, `zh`) |
+| contents[].title | STRING | Announcement title |
+| contents[].subtitle | STRING | Announcement subtitle |
+| contents[].content | STRING | Announcement body text |
+| category | STRING | Announcement category |
+| publishTime | LONG | Publish timestamp (milliseconds) |
+| jumpLink | STRING | Link to the full announcement page |

@@ -51,6 +51,33 @@
 
 ---
 
+## Aster-Chain 质押接口
+
+### 查询锁定 Aster 总量 (NONE)
+
+> **响应:**
+
+```javascript
+{
+    "periodCode": "208_WEEKS",
+    "totalVolume": 291534089.64644974
+}
+```
+
+`GET /aster-chain/v3/staking/getLockedAster`
+
+查询全网所有 208 周质押仓位中锁定的 ASTER 代币总量。
+
+**权重:** 20
+
+**参数:**
+
+无
+
+---
+
+## Aster-Chain 划转接口
+
 ### 转账至地址 (WITHDRAW)
 
 > **响应:**

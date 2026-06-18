@@ -384,3 +384,91 @@ When the user Multi-Assets margin mode changes the payload will contain the obje
     * m[0]: Taker address
 
     * m[1]: Maker address
+
+## **Event: Public Announcement**
+
+> **Payload:**
+
+```javascript
+{
+    "e": "announcement",
+    "en": {
+        "i": 161,
+        "t": "test announcement",
+        "s": "sub title",
+        "c": "NEW_LISTING",
+        "d": 1781684565591,
+        "S": false,
+        "j": "https://asterdex.com",
+        "C": "<p>test content</p>"
+    },
+    "zh": {
+        "i": 161,
+        "t": "测试公告",
+        "s": "子标题",
+        "c": "NEW_LISTING",
+        "d": 1781684565591,
+        "S": false,
+        "j": "https://asterdex.com",
+        "C": "<p>测试内容</p>"
+    }
+}
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| e | STRING | Event type: `announcement` |
+| en | OBJECT | English announcement content |
+| zh | OBJECT | Chinese announcement content |
+| en.i / zh.i | LONG | Announcement ID |
+| en.t / zh.t | STRING | Announcement title |
+| en.s / zh.s | STRING | Announcement subtitle |
+| en.c / zh.c | STRING | Category: `NEW_LISTING` for public announcements |
+| en.d / zh.d | LONG | Announcement timestamp (ms) |
+| en.S / zh.S | BOOLEAN | Read status (`false` = unread) |
+| en.j / zh.j | STRING | Jump link URL |
+| en.C / zh.C | STRING | Announcement content (HTML) |
+
+## **Event: Direct Announcement**
+
+> **Payload:**
+
+```javascript
+{
+    "e": "announcement",
+    "en": {
+        "i": 162,
+        "t": "direct message test",
+        "s": "sub content",
+        "c": "DIRECT",
+        "d": 1781684634276,
+        "S": false,
+        "j": "https://asterdex.finance",
+        "C": "<p>test content</p>"
+    },
+    "zh": {
+        "i": 162,
+        "t": "个人消息测试",
+        "s": "子标题",
+        "c": "DIRECT",
+        "d": 1781684634276,
+        "S": false,
+        "j": "https://asterdex.finance",
+        "C": "<p>测试内容</p>"
+    }
+}
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| e | STRING | Event type: `announcement` |
+| en | OBJECT | English announcement content |
+| zh | OBJECT | Chinese announcement content |
+| en.i / zh.i | LONG | Announcement ID |
+| en.t / zh.t | STRING | Announcement title |
+| en.s / zh.s | STRING | Announcement subtitle |
+| en.c / zh.c | STRING | Category: `DIRECT` for direct (personal) messages |
+| en.d / zh.d | LONG | Announcement timestamp (ms) |
+| en.S / zh.S | BOOLEAN | Read status (`false` = unread) |
+| en.j / zh.j | STRING | Jump link URL |
+| en.C / zh.C | STRING | Announcement content (HTML) |

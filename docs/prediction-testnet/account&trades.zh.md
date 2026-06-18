@@ -470,6 +470,98 @@ newClientOrderId | STRING | NO | 客户自定义的唯一订单ID，若不填则
 * 市场关闭（`CLOSED`）后仍可进行销毁操作
 
 
+## 预测市场拆分 (TRADE)
+
+> **响应**
+
+```javascript
+{
+ "clientOrderId": "xxx",
+ "qty": "10.00000000",
+ "counterparties": [
+ {
+ "symbol": "EVENT4_ALGERIA_WIN_YUSDT",
+ "price": "0.15000000"
+ },
+ {
+ "symbol": "EVENT4_ARGENTINA_WIN_YUSDT",
+ "price": "0.25000000"
+ }
+ ],
+ "sourceNoLastPrice": "0.85000000"
+}
+```
+
+`POST /api/v3/prediction/split`
+
+对于多结果预测事件，将报价资产（USDT）转换为指定预测市场的结果代币。账户花费报价资产，获得目标市场等量的各结果代币。
+
+**权重:** 1
+
+**参数:**
+
+名称 | 类型 | 是否必需 | 描述
+------------ | ------------ | ------------ | ------------
+event | STRING | YES | 预测事件名称（如 `EVENT4`）
+symbol | STRING | YES | 目标预测市场的 YES 或 NO 代币交易对
+quantity | DECIMAL | YES | 要获取的结果代币组数；必须为正整数
+newClientOrderId | STRING | NO | 客户自定义的唯一订单ID，若不填则自动生成
+signer | STRING | YES | API钱包地址
+nonce | STRING | YES | 当前时间的微秒值
+signature | STRING | YES | 签名
+
+注意:
+* `symbol` 必须是有效的预测市场代币交易对（YES 或 NO 均可），且状态为 `TRADING` 或 `PENDING_TRADING`；系统会自动解析对应的 YES 代币
+* `quantity` 必须为整数，不含小数
+* `counterparties` 包含参与拆分的各结果代币及其价格
+* `sourceNoLastPrice` 为拆分时来源交易对 NO 代币的最新价格
+
+
+## 预测市场合并 (TRADE)
+
+> **响应**
+
+```javascript
+{
+ "clientOrderId": "xxx",
+ "qty": "10.00000000",
+ "counterparties": [
+ {
+ "symbol": "EVENT4_ALGERIA_WIN_YUSDT",
+ "price": "0.15000000"
+ },
+ {
+ "symbol": "EVENT4_ARGENTINA_WIN_YUSDT",
+ "price": "0.25000000"
+ }
+ ]
+}
+```
+
+`POST /api/v3/prediction/merge`
+
+对于多结果预测事件，将一组结果代币退回以赎回报价资产（USDT）。账户提交事件中所有结果代币的等量份额，换回报价资产。
+
+**权重:** 1
+
+**参数:**
+
+名称 | 类型 | 是否必需 | 描述
+------------ | ------------ | ------------ | ------------
+event | STRING | YES | 预测事件名称（如 `EVENT4`）
+quantity | DECIMAL | YES | 要提交的结果代币组数；必须为正整数
+newClientOrderId | STRING | NO | 客户自定义的唯一订单ID，若不填则自动生成
+signer | STRING | YES | API钱包地址
+nonce | STRING | YES | 当前时间的微秒值
+signature | STRING | YES | 签名
+
+注意:
+* 账户必须持有足够数量的该事件所有结果代币
+* `quantity` 必须为整数，不含小数
+* 响应中的 `qty` 以报价资产（USDT）计价
+* `counterparties` 包含合并过程中消耗的各结果代币及其价格
+
+
 ## 查询预测市场当前仓位 (USER_DATA)
 
 > **响应**

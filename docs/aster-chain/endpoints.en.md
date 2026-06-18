@@ -51,6 +51,33 @@ Modify the account's privacy status. After a successful update, the change is br
 
 ---
 
+## Aster-Chain Staking Endpoints
+
+### Get Locked Aster (NONE)
+
+> **Response:**
+
+```javascript
+{
+    "periodCode": "208_WEEKS",
+    "totalVolume": 291534089.64644974
+}
+```
+
+`GET /aster-chain/v3/staking/getLockedAster`
+
+Query the total amount of ASTER tokens locked across all 208-week staking positions on the network.
+
+**Weight:** 20
+
+**Parameters:**
+
+None
+
+---
+
+## Aster-Chain Transfer Endpoints
+
 ### Transfer to Address (WITHDRAW)
 
 > **Response:**

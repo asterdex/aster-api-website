@@ -63,6 +63,9 @@ plugins:
             Prediction Testnet: 预测市场测试网
             Aster Chain: Aster Chain
             Aster Code: Aster Code
+            BAPI: BAPI
+            Announcement: 公告
+            Portfolio: 投资组合
             Integration Flow: 对接流程
             Authentication: 鉴权方式
             Endpoints: 接口列表
@@ -127,6 +130,10 @@ nav:
 
   - Aster Chain:
       - Endpoints: aster-chain/endpoints.md
+
+  - BAPI:
+      - Announcement: bapi/announcement.md
+      - Portfolio: bapi/portfolio.md
 
   - Futures Testnet:
       - General Info: futures-testnet/general-info.md
