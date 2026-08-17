@@ -355,7 +355,7 @@ price | DECIMAL | NO | 委托价格
 
 ``POST /fapi/v3/chase``
 
-下一笔**追单策略订单** —— BBO peg GTX 限价单，自动跟随最优买/卖价重新挂单。策略服务每个 tick 轮询订单簿，实时修改委托价格，使订单保持在盘口前列，直到成交或市场偏离原始 BBO 超过 `maxChaseOffset`。
+下一笔**追单策略订单** —— BBO peg GTX 限价单，自动跟随最优买/卖价重新挂单。追单策略每秒轮询一次订单簿；若相关 BBO 价格发生变化，策略将相应修改委托价格，使订单保持在盘口前列，直到成交或市场偏离原始 BBO 超过 `maxChaseOffset`。
 
 **权重:** 1
 
@@ -395,7 +395,7 @@ price | DECIMAL | NO | 委托价格
 **行为:**
 
 * 初始订单以 GTX（post-only）LIMIT 形式发出，`pegPriceType = QUEUE_1`、`pegOffset` 取符号（买单为负，卖单为正）。
-* 策略服务每秒轮询，将订单价格修改为 `bid1 − chaseOffset`（买单）或 `ask1 + chaseOffset`（卖单），跟随 BBO 移动。
+* 策略服务每秒轮询订单簿一次，BBO 发生变化时修改委托价格，将订单维持在 `bid1 − chaseOffset`（买单）或 `ask1 + chaseOffset`（卖单）。
 * 当市场偏移超过 `maxChaseOffset` 时**自动撤销**，原因为 `OFFSET_CANCELLED`。
 * 追单在以下情形终止：成交、用户撤单（`DELETE /fapi/v3/order`）、`maxChaseOffset` 触发。
 

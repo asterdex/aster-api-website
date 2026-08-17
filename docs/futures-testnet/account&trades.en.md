@@ -318,7 +318,7 @@ price | DECIMAL | NO | Order price
 * If the new `quantity` or `price` does not meet `PRICE_FILTER` / `PERCENT_FILTER` / `LOT_SIZE` restrictions, the modification will be rejected and the original order will remain.
 * Only `LIMIT` order type is supported.
 * Maximum 10000 modifications per order.
-* **BBO-pegged orders** (those placed with `pegPriceType` = `COUNTERPARTY_1` / `QUEUE_1`): the engine resolves the actual price from the order book at trigger time. To auto-track the BBO with a continuously re-pegged limit order, use a **Chase order** (see `POST /fapi/v3/chase` below) which the strategy service amends in real time as the BBO moves.
+* **BBO-pegged orders** (those placed with `pegPriceType` = `COUNTERPARTY_1` / `QUEUE_1`): the engine resolves the actual price from the order book at trigger time. To auto-track the BBO with a continuously re-pegged limit order, use a **Chase order** (see `POST /fapi/v3/chase` below) which the strategy service polls every second and amends when the BBO moves.
 
 ## Place Chase Order (TRADE)
 
@@ -347,7 +347,7 @@ price | DECIMAL | NO | Order price
 
 ``POST /fapi/v3/chase``
 
-Place a **Chase strategy order** — a BBO-pegged GTX limit order that automatically re-pegs to the best bid/ask as the market moves. The strategy service polls the order book each tick and amends the order price in real time to keep the order near the top of the book until it fills or until the market moves beyond `maxChaseOffset` from the original BBO.
+Place a **Chase strategy order** — a BBO-pegged GTX limit order that automatically re-pegs to the best bid/ask as the market moves. The Chase Order strategy polls the order book once per second; if the relevant BBO price has changed, the strategy amends the order price accordingly to keep the order near the top of the book until it fills or until the market moves beyond `maxChaseOffset` from the original BBO.
 
 **Weight:** 1
 
@@ -387,7 +387,7 @@ Place a **Chase strategy order** — a BBO-pegged GTX limit order that automatic
 **Behavior:**
 
 * The initial order is placed as a GTX (post-only) limit with `pegPriceType = QUEUE_1` and signed `pegOffset` (negative for BUY, positive for SELL).
-* The strategy service polls every second and amends the order price as the BBO moves, keeping the order at `bid1 − chaseOffset` (BUY) or `ask1 + chaseOffset` (SELL).
+* The strategy service polls the order book every second and amends the order price when the BBO moves, keeping the order at `bid1 − chaseOffset` (BUY) or `ask1 + chaseOffset` (SELL).
 * If the market moves beyond `maxChaseOffset` from the original BBO, the chase **auto-cancels** with reason `OFFSET_CANCELLED`.
 * The chase terminates on FILL, user cancel (via standard `DELETE /fapi/v3/order`), or `maxChaseOffset` breach.
 
