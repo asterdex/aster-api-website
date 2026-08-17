@@ -69,6 +69,9 @@ plugins:
             Integration Flow: 对接流程
             Authentication: 鉴权方式
             Endpoints: 接口列表
+            Spot Integration Flow: Spot 对接流程
+            Spot Authentication: Spot 鉴权方式
+            Spot Endpoints: Spot 接口列表
             Demo: Demo
             Changelog: 更新日志
             Upcoming Changes: 即将发布
@@ -123,6 +126,9 @@ nav:
       - Integration Flow: asterCode/integration-flow.md
       - Authentication: asterCode/authentication.md
       - Endpoints: asterCode/endpoints.md
+      - Spot Integration Flow: asterCode/spot-integration-flow.md
+      - Spot Authentication: asterCode/spot-authentication.md
+      - Spot Endpoints: asterCode/spot-endpoints.md
 
   - RPC:
       - General Info: rpc/general-info.md
@@ -163,6 +169,7 @@ nav:
 
   - Changelog: 
       - Upcoming Changes: changelog/upcoming-changes.md
+      - 2026-8-17: changelog/2026-8-17.md
       - 2026-7-16: changelog/2026-7-16.md
       - 2026-7-10: changelog/2026-7-10.md
       - 2026-7-7: changelog/2026-7-7.md

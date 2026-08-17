@@ -14,33 +14,34 @@ POST /fapi/v3/approveAgent
 
 Create/approve an Agent/API Wallet (signer) for programmatic trading, and configure permissions, IP whitelist, and expiry time.
 
-**Supports setting builder and maxFeeRate to approve the builder at the same time.**
-
-
+Optionally, one or both Builder authorizations (Futures Builder and/or Spot Builder) can be set together with Agent approval in a single request, or they can be authorized separately after Agent approval.
 
 **Weight:**
 
 TBD
 
-
-
 **Parameters:**
 
-| **Name**     | **Type** | **Mandatory** | **Description**                                             |
-| ------------ | -------- | ------------- | ----------------------------------------------------------- |
-| user         | STRING   | YES           | User main address                                           |
-| nonce        | LONG     | YES           | Anti-replay nonce (microseconds-style)                      |
-| signature    | STRING   | YES           | EIP-712 signature (primaryType=ApproveAgent)                |
-| agentName    | STRING   | YES           | Agent name (label)                                          |
-| agentAddress | STRING   | YES           | Agent address (signer address)                              |
-| ipWhitelist  | STRING   | NO            | IP whitelist (recommended: Builder backend egress IP)       |
-| expired      | LONG     | YES           | Expiry timestamp (ms)                                       |
-| canSpotTrade | BOOLEAN  | YES           | Whether spot trading is allowed                             |
-| canPerpTrade | BOOLEAN  | YES           | Whether perp trading is allowed                             |
-| canWithdraw  | BOOLEAN  | YES           | Whether withdrawals are allowed (recommended default false) |
-| builder      | STRING   | NO            | Builder address (attribution/fee recipient)                 |
-| maxFeeRate   | STRING   | NO            | Builder maximum fee rate cap (string/decimal text)          |
-| builderName   | STRING   | NO          | Builder name             |
+| **Name**        | **Type** | **Mandatory** | **Description**                                                                            |
+| --------------- | -------- | ------------- | ------------------------------------------------------------------------------------------ |
+| user            | STRING   | YES           | User main address                                                                          |
+| nonce           | LONG     | YES           | Anti-replay nonce (microseconds-style)                                                     |
+| signature       | STRING   | YES           | EIP-712 signature (primaryType=ApproveAgent)                                               |
+| agentName       | STRING   | YES           | Agent name (label)                                                                         |
+| agentAddress    | STRING   | YES           | Agent address (signer address)                                                             |
+| ipWhitelist     | STRING   | NO            | IP whitelist (recommended: Builder backend egress IP)                                      |
+| expired         | LONG     | YES           | Expiry timestamp (ms)                                                                      |
+| canSpotTrade    | BOOLEAN  | YES           | Whether spot trading is allowed                                                            |
+| canPerpTrade    | BOOLEAN  | YES           | Whether perp trading is allowed                                                            |
+| canWithdraw     | BOOLEAN  | YES           | Whether withdrawals are allowed (recommended default false)                                 |
+| builder         | STRING   | NO            | **Futures Builder** address. If provided, simultaneously authorizes this Futures Builder.  |
+| maxFeeRate      | STRING   | NO            | **Futures Builder** maximum fee rate cap. Required when `builder` is provided.             |
+| builderName     | STRING   | NO            | **Futures Builder** name.                                                                  |
+| spotBuilder     | STRING   | NO            | **Spot Builder** address. If provided, simultaneously authorizes this Spot Builder.        |
+| maxSpotFeeRate  | STRING   | NO            | **Spot Builder** maximum fee rate cap. Required when `spotBuilder` is provided.            |
+| spotBuilderName | STRING   | NO            | **Spot Builder** name.                                                                     |
+
+> **Note:** `builder` / `maxFeeRate` / `builderName` apply to the **Futures** Builder. `spotBuilder` / `maxSpotFeeRate` / `spotBuilderName` apply to the **Spot** Builder. They are independent and can be configured separately or together.
 
 
 

@@ -12,33 +12,36 @@ POST /fapi/v3/approveAgent
 
 
 
-创建/授权一个 Agent/API Wallet（signer）用于程序化交易，并配置权限、IP 白名单、过期时间；**支持设置 builder 与 maxFeeRate，用来同时授权builder。**
+创建/授权一个 Agent/API Wallet（signer）用于程序化交易，并配置权限、IP 白名单、过期时间。
 
-
+可选地，Futures Builder 和/或 Spot Builder 的授权可以在授权 Agent 时一并完成，也可以在 Agent 授权后单独进行。
 
 **Weight:**
 
 TBD
 
-
-
 **Parameters:**
 
-| **Name**     | **Type** | **Mandatory** | **Description**                                      |
-| ------------ | -------- | ------------- | ---------------------------------------------------- |
-| user         | STRING   | YES           | 用户主地址                                           |
-| nonce        | LONG     | YES           | 防重放 nonce（微秒格式）                             |
-| signature    | STRING   | YES           | EIP-712 签名（primaryType=ApproveAgent）             |
-| agentName    | STRING   | YES           | Agent 名称（label）                                  |
-| agentAddress | STRING   | YES           | Agent 地址（signer 地址）                            |
-| ipWhitelist  | STRING   | NO            | 允许调用的 IP 白名单（建议配置 Builder 后端出口 IP） |
-| expired      | LONG     | YES           | 过期时间戳（毫秒）                                   |
-| canSpotTrade | BOOLEAN  | YES           | 是否允许现货交易                                     |
-| canPerpTrade | BOOLEAN  | YES           | 是否允许合约交易                                     |
-| canWithdraw  | BOOLEAN  | YES           | 是否允许提现（建议默认 false）                       |
-| builder      | STRING   | NO            | Builder 地址（归因/收款地址）                        |
-| maxFeeRate   | STRING   | NO            | Builder 最大费率上限（字符串或小数文本）             |
-| builderName   | STRING   | NO          | Builder 名称             |
+| **Name**        | **Type** | **Mandatory** | **Description**                                                                               |
+| --------------- | -------- | ------------- | --------------------------------------------------------------------------------------------- |
+| user            | STRING   | YES           | 用户主地址                                                                                    |
+| nonce           | LONG     | YES           | 防重放 nonce（微秒格式）                                                                      |
+| signature       | STRING   | YES           | EIP-712 签名（primaryType=ApproveAgent）                                                      |
+| agentName       | STRING   | YES           | Agent 名称（label）                                                                           |
+| agentAddress    | STRING   | YES           | Agent 地址（signer 地址）                                                                     |
+| ipWhitelist     | STRING   | NO            | 允许调用的 IP 白名单（建议配置 Builder 后端出口 IP）                                          |
+| expired         | LONG     | YES           | 过期时间戳（毫秒）                                                                            |
+| canSpotTrade    | BOOLEAN  | YES           | 是否允许现货交易                                                                              |
+| canPerpTrade    | BOOLEAN  | YES           | 是否允许合约交易                                                                              |
+| canWithdraw     | BOOLEAN  | YES           | 是否允许提现（建议默认 false）                                                                |
+| builder         | STRING   | NO            | **Futures Builder** 地址。若传入，则同时授权该 Futures Builder。                              |
+| maxFeeRate      | STRING   | NO            | **Futures Builder** 最大费率上限。传入 `builder` 时必须提供。                                 |
+| builderName     | STRING   | NO            | **Futures Builder** 名称。                                                                    |
+| spotBuilder     | STRING   | NO            | **Spot Builder** 地址。若传入，则同时授权该 Spot Builder。                                    |
+| maxSpotFeeRate  | STRING   | NO            | **Spot Builder** 最大费率上限。传入 `spotBuilder` 时必须提供。                                |
+| spotBuilderName | STRING   | NO            | **Spot Builder** 名称。                                                                       |
+
+> **说明：** `builder` / `maxFeeRate` / `builderName` 适用于 **Futures Builder**；`spotBuilder` / `maxSpotFeeRate` / `spotBuilderName` 适用于 **Spot Builder**，二者相互独立，可分别或同时配置。
 
 
 
