@@ -35,13 +35,12 @@ TBD
 | canPerpTrade    | BOOLEAN  | YES           | 是否允许合约交易                                                                              |
 | canWithdraw     | BOOLEAN  | YES           | 是否允许提现（建议默认 false）                                                                |
 | builder         | STRING   | NO            | **Futures Builder** 地址。若传入，则同时授权该 Futures Builder。                              |
-| maxFeeRate      | STRING   | NO            | **Futures Builder** 最大费率上限。传入 `builder` 时必须提供。                                 |
+| maxFeeRate      | STRING   | NO            | Builder 最大费率上限。与 `builder`（Futures Builder）配合使用时最大允许值为 `0.001`；与 `spotBuilder`（Spot Builder）配合使用时最大允许值为 `0.01`。 |
 | builderName     | STRING   | NO            | **Futures Builder** 名称。                                                                    |
 | spotBuilder     | STRING   | NO            | **Spot Builder** 地址。若传入，则同时授权该 Spot Builder。                                    |
-| maxSpotFeeRate  | STRING   | NO            | **Spot Builder** 最大费率上限。传入 `spotBuilder` 时必须提供。                                |
 | spotBuilderName | STRING   | NO            | **Spot Builder** 名称。                                                                       |
 
-> **说明：** `builder` / `maxFeeRate` / `builderName` 适用于 **Futures Builder**；`spotBuilder` / `maxSpotFeeRate` / `spotBuilderName` 适用于 **Spot Builder**，二者相互独立，可分别或同时配置。
+> **说明：** `builder` / `builderName` 与 `maxFeeRate`（最大 `0.001`）配合使用，用于配置 **Futures Builder**；`spotBuilder` / `spotBuilderName` 与 `maxFeeRate`（最大 `0.01`）配合使用，用于配置 **Spot Builder**。两者相互独立，可分别或同时配置。
 
 
 
@@ -238,9 +237,9 @@ TBD
 | user       | STRING   | YES           | 用户主地址                                 |
 | nonce      | LONG     | YES           | 防重放 nonce                               |
 | signature  | STRING   | YES           | EIP-712 签名（primaryType=ApproveBuilder） |
-| builderName | STRING   | YES           | Builder 名称（label）                            |
+| builderName | STRING   | NO           | Builder 名称（label）                            |
 | builder    | STRING   | YES           | Builder 地址（归因/收款地址）              |
-| maxFeeRate | STRING   | YES           | 最大费率上限（建议使用字符串格式传小数）   |
+| maxFeeRate | STRING   | YES           | Futures Builder 最大费率上限（小数字符串）。最大允许值：`0.001`。 |
 
 
 
@@ -287,7 +286,7 @@ TBD
 | nonce      | LONG     | YES           | 防重放 nonce                              |
 | signature  | STRING   | YES           | EIP-712 签名（primaryType=UpdateBuilder） |
 | builder    | STRING   | YES           | Builder 地址                              |
-| maxFeeRate | STRING   | YES           | 新的最大费率上限                          |
+| maxFeeRate | STRING   | YES           | Futures Builder 新的最大费率上限。最大允许值：`0.001`。 |
 
 
 

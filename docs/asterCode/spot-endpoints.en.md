@@ -14,8 +14,8 @@ Authorizes a Spot Builder and sets the maximum fee rate cap (`maxFeeRate`) that 
 
 | **Name**        | **Type** | **Mandatory** | **Description**                                                       |
 | --------------- | -------- | ------------- | --------------------------------------------------------------------- |
-| builder         | STRING   | YES           | Spot Builder wallet address                                           |
-| maxFeeRate      | STRING   | YES           | Maximum fee rate the Builder is authorized to charge (decimal string) |
+| builder         | STRING   | YES           | Spot Builder wallet address                                                         |
+| maxFeeRate      | STRING   | YES           | Maximum fee rate the Spot Builder is authorized to charge (decimal string). Maximum value: `0.01`. |
 | builderName     | STRING   | NO            | Builder name                                                          |
 | asterChain      | STRING   | YES           | Aster environment identifier                                          |
 | user            | STRING   | YES           | User main wallet address                                              |
@@ -62,7 +62,7 @@ A successful request returns **HTTP 200** with a **zero-byte response body** (no
 **Builder preconditions:**
 - Must be registered in Aster
 - Must have a Spot account
-- Must satisfy the applicable ASTER balance requirement
+- Must hold at least `100 ASTER` in its **Spot account**
 - Must not equal the user address
 - Must not be blacklisted
 
@@ -84,8 +84,8 @@ Updates the maximum fee rate cap for an existing Spot Builder authorization.
 
 | **Name**        | **Type** | **Mandatory** | **Description**                                              |
 | --------------- | -------- | ------------- | ------------------------------------------------------------ |
-| builder         | STRING   | YES           | Spot Builder address                                         |
-| maxFeeRate      | STRING   | YES           | New maximum fee rate cap (decimal string)                    |
+| builder         | STRING   | YES           | Spot Builder address                                                                |
+| maxFeeRate      | STRING   | YES           | New maximum fee rate cap for the Spot Builder (decimal string). Maximum value: `0.01`. |
 | asterChain      | STRING   | YES           | Aster environment identifier                                 |
 | user            | STRING   | YES           | User main wallet address                                     |
 | nonce           | LONG     | YES           | Anti-replay nonce                                            |

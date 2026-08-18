@@ -35,13 +35,12 @@ TBD
 | canPerpTrade    | BOOLEAN  | YES           | Whether perp trading is allowed                                                            |
 | canWithdraw     | BOOLEAN  | YES           | Whether withdrawals are allowed (recommended default false)                                 |
 | builder         | STRING   | NO            | **Futures Builder** address. If provided, simultaneously authorizes this Futures Builder.  |
-| maxFeeRate      | STRING   | NO            | **Futures Builder** maximum fee rate cap. Required when `builder` is provided.             |
+| maxFeeRate      | STRING   | NO            | Maximum Builder fee rate cap. When paired with `builder` (Futures Builder): maximum `0.001`. When paired with `spotBuilder` (Spot Builder): maximum `0.01`. |
 | builderName     | STRING   | NO            | **Futures Builder** name.                                                                  |
 | spotBuilder     | STRING   | NO            | **Spot Builder** address. If provided, simultaneously authorizes this Spot Builder.        |
-| maxSpotFeeRate  | STRING   | NO            | **Spot Builder** maximum fee rate cap. Required when `spotBuilder` is provided.            |
 | spotBuilderName | STRING   | NO            | **Spot Builder** name.                                                                     |
 
-> **Note:** `builder` / `maxFeeRate` / `builderName` apply to the **Futures** Builder. `spotBuilder` / `maxSpotFeeRate` / `spotBuilderName` apply to the **Spot** Builder. They are independent and can be configured separately or together.
+> **Note:** `builder` / `builderName` pair with `maxFeeRate` (max `0.001`) to configure a **Futures Builder**. `spotBuilder` / `spotBuilderName` pair with `maxFeeRate` (max `0.01`) to configure a **Spot Builder**. The two authorizations are independent and can be configured separately or together.
 
 
 
@@ -239,8 +238,8 @@ TBD
 | user       | STRING   | YES           | User main address                                         |
 | nonce      | LONG     | YES           | Anti-replay nonce                                         |
 | signature  | STRING   | YES           | EIP-712 signature (primaryType=ApproveBuilder)            |
-| builder    | STRING   | YES           | Builder address (attribution/fee recipient)               |
-| maxFeeRate | STRING   | YES           | Max fee rate cap (recommended to pass decimals as string) |
+| builder    | STRING   | YES           | Builder address (attribution/fee recipient)                                  |
+| maxFeeRate | STRING   | YES           | Maximum fee rate the Futures Builder is allowed to charge. Maximum value: `0.001`. |
 
 
 
@@ -286,8 +285,8 @@ TBD
 | user       | STRING   | YES           | User main address                             |
 | nonce      | LONG     | YES           | Anti-replay nonce                             |
 | signature  | STRING   | YES           | EIP-712 signature (primaryType=UpdateBuilder) |
-| builder    | STRING   | YES           | Builder address                               |
-| maxFeeRate | STRING   | YES           | New max fee rate cap                          |
+| builder    | STRING   | YES           | Builder address                                                              |
+| maxFeeRate | STRING   | YES           | New maximum fee rate cap for the Futures Builder. Maximum value: `0.001`.    |
 
 
 

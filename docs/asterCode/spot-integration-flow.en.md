@@ -12,8 +12,15 @@ Spot Aster Code allows a registered Builder to place Spot orders on behalf of us
 ## **Integration Flow**
 
 ### 1. Prepare a Spot Builder
-- Register a Builder address on Aster (must hold at least the minimum required ASTER balance).
+- Register a Builder address on Aster. The Builder must hold at least `100 ASTER` in its **Spot account** to enable Spot Builder functionality.
 - The Builder address is used for order attribution and fee collection.
+
+**Spot Builder requirements:**
+- The Builder must be registered on Aster.
+- The Builder must hold at least `100 ASTER` in its **Spot account**.
+- The maximum allowed `maxFeeRate` is `0.01`.
+
+> **Note:** The ASTER balance requirement is product-specific. To enable a Futures Builder, at least `100 ASTER` must be held in the Builder's Futures account. To enable a Spot Builder, at least `100 ASTER` must be held in the Builder's Spot account. These two requirements are evaluated independently.
 
 ### 2. Create an API Wallet / Agent
 - Generate a `signer` address + private key for each user.
@@ -29,7 +36,7 @@ There are **two ways** to authorize a Spot Builder — choose one:
 
 **Option A — Authorize together with Agent approval**
 
-Include `spotBuilder`, `maxSpotFeeRate`, and optionally `spotBuilderName` in the `POST /fapi/v3/approveAgent` request. The Spot Builder is authorized in the same transaction.
+Include `spotBuilder`, `maxFeeRate` (maximum value: `0.01`), and optionally `spotBuilderName` in the `POST /fapi/v3/approveAgent` request. The Spot Builder is authorized in the same transaction.
 
 **Option B — Authorize separately after Agent approval**
 

@@ -14,8 +14,8 @@
 
 | **Name**        | **Type** | **Mandatory** | **Description**                                             |
 | --------------- | -------- | ------------- | ----------------------------------------------------------- |
-| builder         | STRING   | YES           | Spot Builder 钱包地址                                       |
-| maxFeeRate      | STRING   | YES           | 用户授权的最大费率上限（小数字符串）                        |
+| builder         | STRING   | YES           | Spot Builder 钱包地址                                                          |
+| maxFeeRate      | STRING   | YES           | 用户授权的 Spot Builder 最大费率上限（小数字符串）。最大允许值：`0.01`。       |
 | builderName     | STRING   | NO            | Builder 名称                                                |
 | asterChain      | STRING   | YES           | Aster 环境标识符                                            |
 | user            | STRING   | YES           | 用户主钱包地址                                              |
@@ -62,7 +62,7 @@ Builder, MaxFeeRate, BuilderName, AsterChain, User, Nonce
 **Builder 前置条件：**
 - 必须在 Aster 注册
 - 必须拥有现货账户
-- 必须满足 ASTER 最低余额要求
+- **Spot 账户**中至少持有 `100 ASTER`
 - 不能与用户地址相同
 - 不能在黑名单中
 
@@ -84,8 +84,8 @@ Builder, MaxFeeRate, BuilderName, AsterChain, User, Nonce
 
 | **Name**        | **Type** | **Mandatory** | **Description**                                  |
 | --------------- | -------- | ------------- | ------------------------------------------------ |
-| builder         | STRING   | YES           | Spot Builder 地址                                |
-| maxFeeRate      | STRING   | YES           | 新的最大费率上限（小数字符串）                   |
+| builder         | STRING   | YES           | Spot Builder 地址                                                               |
+| maxFeeRate      | STRING   | YES           | Spot Builder 新的最大费率上限（小数字符串）。最大允许值：`0.01`。               |
 | asterChain      | STRING   | YES           | Aster 环境标识符                                 |
 | user            | STRING   | YES           | 用户主钱包地址                                   |
 | nonce           | LONG     | YES           | 防重放 nonce                                     |

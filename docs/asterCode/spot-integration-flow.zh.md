@@ -12,8 +12,15 @@ Spot Aster Code 允许已注册的 Builder 代用户进行现货下单，并通�
 ## **对接流程**
 
 ### 1. 准备 Spot Builder
-- 在 Aster 注册 Builder 地址（需持有不低于最低要求数量的 ASTER 余额）。
+- 在 Aster 注册 Builder 地址。Builder 的 **Spot 账户**中至少须持有 `100 ASTER`，才能开通 Spot Builder 功能。
 - Builder 地址用于订单归因与费用收取。
+
+**Spot Builder 前置条件：**
+- Builder 必须在 Aster 注册。
+- Builder 的 **Spot 账户**中至少持有 `100 ASTER`。
+- `maxFeeRate` 最大允许值为 `0.01`。
+
+> **说明：** ASTER 持仓要求按产品账户独立计算。Futures Builder 要求 Builder 的 Futures 账户至少持有 `100 ASTER`；Spot Builder 要求 Builder 的 Spot 账户至少持有 `100 ASTER`，两者独立判断，互不替代。
 
 ### 2. 创建 API Wallet / Agent
 - 为每个用户生成一套 `signer` 地址 + 私钥。
@@ -29,7 +36,7 @@ Spot Aster Code 允许已注册的 Builder 代用户进行现货下单，并通�
 
 **方式 A — 在授权 Agent 时同时授权**
 
-在 `POST /fapi/v3/approveAgent` 请求中加入 `spotBuilder`、`maxSpotFeeRate` 及可选的 `spotBuilderName`，即可在同一请求中完成 Spot Builder 的授权。
+在 `POST /fapi/v3/approveAgent` 请求中加入 `spotBuilder`、`maxFeeRate`（最大允许值：`0.01`）及可选的 `spotBuilderName`，即可在同一请求中完成 Spot Builder 的授权。
 
 **方式 B — 在授权 Agent 后单独授权**
 

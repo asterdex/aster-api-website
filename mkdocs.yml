@@ -66,9 +66,9 @@ plugins:
             BAPI: BAPI
             Announcement: 公告
             Portfolio: 投资组合
-            Integration Flow: 对接流程
-            Authentication: 鉴权方式
-            Endpoints: 接口列表
+            Futures Integration Flow: Futures 对接流程
+            Futures Authentication: Futures 鉴权方式
+            Futures Endpoints: Futures 接口列表
             Spot Integration Flow: Spot 对接流程
             Spot Authentication: Spot 鉴权方式
             Spot Endpoints: Spot 接口列表
@@ -123,9 +123,9 @@ nav:
   #     - Error Codes: spot/error-codes.md
 
   - Aster Code: 
-      - Integration Flow: asterCode/integration-flow.md
-      - Authentication: asterCode/authentication.md
-      - Endpoints: asterCode/endpoints.md
+      - Futures Integration Flow: asterCode/integration-flow.md
+      - Futures Authentication: asterCode/authentication.md
+      - Futures Endpoints: asterCode/endpoints.md
       - Spot Integration Flow: asterCode/spot-integration-flow.md
       - Spot Authentication: asterCode/spot-authentication.md
       - Spot Endpoints: asterCode/spot-endpoints.md
