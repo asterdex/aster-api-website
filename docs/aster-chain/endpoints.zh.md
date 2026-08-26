@@ -110,3 +110,408 @@
 | nonce | LONG | YES | 微秒时间戳 |
 | user | STRING | YES | 发起账户钱包地址 |
 | signature | STRING | YES | EIP-712 签名，使用 `user` 账户的钱包私钥签名 |
+
+---
+
+## Aster-Chain 充值
+
+充值在源链上完成，不同网络的充值方式不同：
+
+### EVM
+
+EVM 链的充值通过与源链上的 vault 合约直接交互完成，有两种方式：
+
+1. 调用 vault 合约的 `depositFor` 方法，交易链上确认后，资产入账至 `forAddress` 账户。
+2. 直接向 vault 合约地址转账，资产入账至转账发起地址。
+
+**主网合约地址：**
+
+| 链 | Chain ID | 合约地址 |
+|----|----------|----------|
+| ETH | 1 | `0x604DD02d620633Ae427888d41bfd15e38483736E` |
+| BSC | 56 | `0x128463A60784c4D3f46c23Af3f65Ed859Ba87974` |
+| Arbitrum | 42161 | `0x9E36CB86a159d479cEd94Fa05036f235Ac40E1d5` |
+
+**depositFor：**
+
+```solidity
+function depositFor(address currency, address forAddress, uint256 amount, uint256 broker) external payable
+```
+
+| 名称 | 类型 | 描述 |
+|------|------|------|
+| currency | ADDRESS | 代币合约地址；原生币（如 BNB、ETH）传固定占位地址 `0xfdAE1bA7C826aBDc4c99903c8056f82a1A04a615` |
+| forAddress | ADDRESS | 接收充值资产的用户地址 |
+| amount | UINT256 | 充值数量，使用代币最小单位（wei）；原生币必须与 `msg.value` 一致 |
+| broker | UINT256 | 目标账户标识：传 `1000` 充值至**现货**账户，其他值充值至**合约**账户 |
+
+* ERC20 充值需先对 vault 合约 `approve` 授权，且 `msg.value` 必须为 0。
+* 原生币充值通过 `msg.value` 转入，金额必须与 `amount` 参数一致。
+
+### Solana
+
+Solana 链上**只能**通过调用以下合约方法充值，直接向 vault 地址转账**不会**入账。
+
+**主网 Program 地址：** `EhUtRgu9iEbZXXRpEvDj6n1wnQRjMi2SERDo3c6bmN2c`
+
+共有两个充值方法，参数均为 `amount`（u64，代币最小单位）：
+
+1. `depositSol`：充值原生代币（SOL）。
+2. `depositToken`：充值 SPL 代币（如 USDT）。
+
+**depositSol accounts：**
+
+| 账户 | isSigner | isMut | 描述 |
+|------|----------|-------|------|
+| signer | true | true | 充值用户的钱包地址，资产入账至该地址 |
+| admin | false | false | Admin 账户 |
+| solVault | false | true | SOL vault 账户 |
+| systemProgram | false | false | 固定值：`11111111111111111111111111111111` |
+
+**depositToken accounts：**
+
+| 账户 | isSigner | isMut | 描述 |
+|------|----------|-------|------|
+| signer | true | false | 充值用户的钱包地址，资产入账至该地址 |
+| admin | false | false | Admin 账户 |
+| bank | false | false | 代币对应的 Bank 账户 |
+| tokenVaultAuthority | false | false | Token vault authority 账户 |
+| tokenVault | false | true | Token vault 账户 |
+| depositor | false | true | 充值用户在 `tokenMint` 下的关联代币账户（ATA） |
+| tokenMint | false | false | 代币 Mint 地址 |
+| tokenProgram | false | false | 固定值：`TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA` |
+| associatedTokenProgram | false | false | 固定值：`ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL` |
+| systemProgram | false | false | 固定值：`11111111111111111111111111111111` |
+
+* 目标账户：调用任一方法时，在指令 accounts **最后**追加 `programId` 账户（即 Program 地址）表示充值至**现货**账户；不追加则充值至**合约**账户。
+
+### SUI
+
+SUI 链仅支持**现货**账户。充值通过直接向用户专属充值地址转账完成，无需调用合约：
+
+1. 调用[查询用户充值地址 (USER_DATA)](#查询用户充值地址-user_data) 获取 SUI 链上的充值地址。
+2. 直接向该地址转账，交易链上确认后，资产入账至现货账户。
+
+### 查询用户充值地址 (USER_DATA)
+
+> **响应:**
+
+```javascript
+{
+    "network": "SUI",
+    "address": "0x9a40f0119b670fb6b155744b51981f91c4c4c8a20c333441a63853fe7d055c90"
+}
+```
+
+`GET /aster-chain/v3/spot/user-deposit-address`
+
+查询当前用户在指定网络的专属充值地址。仅支持现货账户。
+
+**权重:** 1
+
+**参数:**
+
+| 名称 | 类型 | 是否必需 | 描述 |
+|------|------|---------|------|
+| network | STRING | NO | 网络类型，默认 `"SUI"` |
+
+---
+
+## Aster-Chain 合约提现与划转接口
+
+### 合约提现 (WITHDRAW)
+
+> **响应:**
+
+```javascript
+{
+    "withdrawId": "987654321",
+    "hash": "0xabc123..."
+}
+```
+
+`POST /aster-chain/v3/perp/user-withdraw`
+
+从合约账户提现至链上地址。
+
+**权重:** 5
+
+**参数:**
+
+| 名称 | 类型 | 是否必需 | 描述 |
+|------|------|---------|------|
+| asset | STRING | YES | 资产名称（如 `"USDT"`） |
+| chainId | INTEGER | YES | 目标链 ID |
+| amount | STRING | YES | 提现金额 |
+| fee | STRING | YES | 提现手续费 |
+| receiver | STRING | YES | 接收方链上地址 |
+| userNonce | STRING | YES | 签名中包含的用户端 nonce |
+| signatureType | STRING | NO | 签名类型：`"EOA"` 或 `"SafeWallet"`，默认 `"EOA"`；账户为 Safe 钱包时传 `"SafeWallet"` |
+| userSignature | STRING | YES | 用户对提现参数的签名；当 `signatureType=SafeWallet` 时，支持多个签名，以逗号分隔 |
+
+---
+
+### 合约 Solana 提现 (WITHDRAW)
+
+> **响应:**
+
+```javascript
+{
+    "withdrawId": "987654321",
+    "hash": "0xabc123..."
+}
+```
+
+`POST /aster-chain/v3/perp/user-solana-withdraw`
+
+从合约账户提现至 Solana 地址。
+
+**权重:** 5
+
+**参数:**
+
+| 名称 | 类型 | 是否必需 | 描述 |
+|------|------|---------|------|
+| asset | STRING | YES | 资产名称（如 `"USDT"`） |
+| chainId | INTEGER | YES | 目标链 ID |
+| amount | STRING | YES | 提现金额 |
+| fee | STRING | YES | 提现手续费 |
+| receiver | STRING | YES | 接收方 Solana 地址 |
+| userNonce | STRING | YES | 签名中包含的用户端 nonce |
+| userSignature | STRING | YES | 用户对提现参数的签名 |
+
+---
+
+### 查询提现信息 (USER_DATA)
+
+> **响应:**
+
+```javascript
+{
+    "userDailyLimit": "10000",
+    "userRemainingDailyLimit": "9500",
+    "totalDailyLimit": "100000",
+    "totalRemainingDailyLimit": "95000",
+    "balances": {
+        "USDT": {
+            "currency": "USDT",
+            "spotTotalWithdrawAmount": "0",
+            "perpTotalWithdrawAmount": "500",
+            "dailyLimit": "5000",
+            "chainBalances": {
+                "1": {
+                    "chainId": 1,
+                    "spotMaxWithdrawAmount": "1000",
+                    "perpMaxWithdrawAmount": "4500",
+                    "chainLimit": "5000",
+                    "withdrawFee": "0.5"
+                }
+            }
+        }
+    }
+}
+```
+
+`GET /aster-chain/v3/perp/user-withdraw-info`
+
+查询当前用户各资产、各链的提现限额及可用余额。
+
+**权重:** 1
+
+**参数:**
+
+无
+
+---
+
+### 充提记录 (USER_DATA)
+
+> **响应:**
+
+```javascript
+[
+    {
+        "id": "12345",
+        "type": "WITHDRAW",   // "DEPOSIT" 或 "WITHDRAW"
+        "asset": "USDT",
+        "amount": "100",
+        "state": "COMPLETED",
+        "txHash": "0xabc123...",
+        "time": 1699900800000,
+        "chainId": 1,
+        "accountType": "perp"
+    }
+]
+```
+
+`GET /aster-chain/v3/perp/deposit-withdraw-history`
+
+查询当前用户合约账户的充值与提现历史记录。
+
+**权重:** 5
+
+**参数:**
+
+| 名称 | 类型 | 是否必需 | 描述 |
+|------|------|---------|------|
+| chainId | STRING | NO | 按链 ID 过滤记录 |
+
+---
+
+### 钱包划转 (TRADE)
+
+> **响应:**
+
+```javascript
+{
+    "tranId": 123456789,
+    "status": "SUCCESS"
+}
+```
+
+`POST /aster-chain/v3/perp/wallet/transfer`
+
+在现货钱包与合约账户之间划转资产。
+
+**权重:** 5
+
+**参数:**
+
+| 名称 | 类型 | 是否必需 | 描述 |
+|------|------|---------|------|
+| asset | STRING | YES | 资产名称（如 `"USDT"`） |
+| amount | DECIMAL | YES | 划转金额，必须大于 0 |
+| clientTranId | STRING | YES | 客户端自定义划转 ID |
+| kindType | STRING | YES | 划转方向：`"SPOT_FUTURE"`（现货 → 合约）或 `"FUTURE_SPOT"`（合约 → 现货） |
+| nonce | LONG | YES | 微秒时间戳 |
+| user | STRING | YES | 发起账户钱包地址 |
+| signature | STRING | YES | EIP-712 签名，使用 `user` 账户的钱包私钥签名 |
+
+---
+
+## Aster-Chain 现货提现与划转接口
+
+### 现货提现 (WITHDRAW)
+
+> **响应:**
+
+```javascript
+{
+    "withdrawId": "987654321",
+    "hash": "0xabc123..."
+}
+```
+
+`POST /aster-chain/v3/spot/user-withdraw`
+
+从现货账户提现至链上地址。
+
+**权重:** 5
+
+**参数:**
+
+| 名称 | 类型 | 是否必需 | 描述 |
+|------|------|---------|------|
+| asset | STRING | YES | 资产名称（如 `"USDT"`） |
+| chainId | INTEGER | YES | 资产所属链的 Chain ID |
+| signatureChainId | INTEGER | NO | 签名使用的链 ID（即 EIP-712 domain 中的 `chainId` 字段），未传时默认取 `chainId` |
+| amount | STRING | YES | 提现金额 |
+| fee | STRING | YES | 提现手续费 |
+| receiver | STRING | YES | 接收方链上地址 |
+| userNonce | STRING | YES | 签名中包含的用户端 nonce |
+| signatureType | STRING | NO | 签名类型：`"EOA"` 或 `"SafeWallet"`，默认 `"EOA"`；账户为 Safe 钱包时传 `"SafeWallet"` |
+| userSignature | STRING | YES | 用户对提现参数的签名；当 `signatureType=SafeWallet` 时，支持多个签名，以逗号分隔 |
+
+---
+
+### 现货 Solana 提现 (WITHDRAW)
+
+> **响应:**
+
+```javascript
+{
+    "withdrawId": "987654321",
+    "hash": "0xabc123..."
+}
+```
+
+`POST /aster-chain/v3/spot/user-solana-withdraw`
+
+从现货账户提现至 Solana 地址。
+
+**权重:** 5
+
+**参数:**
+
+| 名称 | 类型 | 是否必需 | 描述 |
+|------|------|---------|------|
+| asset | STRING | YES | 资产名称（如 `"USDT"`） |
+| chainId | INTEGER | YES | 目标链 ID |
+| amount | DECIMAL | YES | 提现金额 |
+| fee | DECIMAL | YES | 提现手续费 |
+| receiver | STRING | YES | 接收方 Solana 地址 |
+| userNonce | STRING | YES | 签名中包含的用户端 nonce |
+| userSignature | STRING | YES | 用户对提现参数的签名 |
+
+---
+
+### 钱包划转 (TRADE)
+
+> **响应:**
+
+```javascript
+{
+    "tranId": 123456789,
+    "status": "SUCCESS"
+}
+```
+
+`POST /aster-chain/v3/spot/wallet/transfer`
+
+在现货钱包与合约账户之间划转资产。
+
+**权重:** 5
+
+**参数:**
+
+| 名称 | 类型 | 是否必需 | 描述 |
+|------|------|---------|------|
+| asset | STRING | YES | 资产名称（如 `"USDT"`） |
+| amount | DECIMAL | YES | 划转金额，必须大于 0 |
+| clientTranId | STRING | YES | 客户端自定义划转 ID |
+| kindType | STRING | YES | 划转方向：`"SPOT_FUTURE"`（现货 → 合约）或 `"FUTURE_SPOT"`（合约 → 现货） |
+| nonce | LONG | YES | 微秒时间戳 |
+| user | STRING | YES | 发起账户钱包地址 |
+| signature | STRING | YES | EIP-712 签名，使用 `user` 账户的钱包私钥签名 |
+
+---
+
+## Aster-Chain 提现接口
+
+### 估算提现手续费 (NONE)
+
+> **响应:**
+
+```javascript
+{
+    "gasPrice": 1000000000,
+    "gasLimit": 21000,
+    "nativePrice": "1800.00",
+    "tokenPrice": "1.00",
+    "gasCost": "0.000021",
+    "gasUsdValue": "0.038"
+}
+```
+
+`GET /aster-chain/v3/withdraw/estimateFee`
+
+估算指定链和资产的提现 Gas 手续费。
+
+**权重:** 1
+
+**参数:**
+
+| 名称 | 类型 | 是否必需 | 描述 |
+|------|------|---------|------|
+| chainId | INTEGER | YES | 目标链 ID |
+| asset | STRING | YES | 资产名称（如 `"USDT"`） |

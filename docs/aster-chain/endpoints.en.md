@@ -110,3 +110,408 @@ Transfer assets to another Aster Chain address. The recipient address must belon
 | nonce | LONG | YES | Microsecond timestamp |
 | user | STRING | YES | Source account wallet address |
 | signature | STRING | YES | EIP-712 signature, signed with the `user` account's wallet private key |
+
+---
+
+## Aster-Chain Deposit
+
+Deposits are made on the source chain. The deposit method differs by network:
+
+### EVM
+
+Deposits on EVM chains are made by interacting directly with the vault contract on the source chain. There are two ways to deposit:
+
+1. Call the `depositFor` method of the vault contract. Once the transaction is confirmed on-chain, the deposited asset is credited to the `forAddress` account.
+2. Transfer the token directly to the vault contract address. The deposited asset is credited to the sending address.
+
+**Mainnet contract addresses:**
+
+| Chain | Chain ID | Contract Address |
+|-------|----------|------------------|
+| ETH | 1 | `0x604DD02d620633Ae427888d41bfd15e38483736E` |
+| BSC | 56 | `0x128463A60784c4D3f46c23Af3f65Ed859Ba87974` |
+| Arbitrum | 42161 | `0x9E36CB86a159d479cEd94Fa05036f235Ac40E1d5` |
+
+**depositFor:**
+
+```solidity
+function depositFor(address currency, address forAddress, uint256 amount, uint256 broker) external payable
+```
+
+| Name | Type | Description |
+|------|------|-------------|
+| currency | ADDRESS | Token contract address. For the native token, pass the fixed placeholder address `0xfdAE1bA7C826aBDc4c99903c8056f82a1A04a615` |
+| forAddress | ADDRESS | The user's address that receives the deposited asset |
+| amount | UINT256 | Deposit amount in the token's smallest unit (wei). For the native token, it must equal `msg.value` |
+| broker | UINT256 | Target account flag: pass `1000` to deposit to the **spot** account; any other value deposits to the **futures** account |
+
+* For ERC20 deposits, `approve` the vault contract to spend the token before calling `depositFor`, and `msg.value` must be `0`.
+* For native token deposits, send the amount via `msg.value`; it must equal the `amount` parameter.
+
+### Solana
+
+On Solana, deposits can **only** be made by calling the program methods below. Transferring SOL or tokens directly to the vault address will **not** be credited.
+
+**Mainnet program address:** `EhUtRgu9iEbZXXRpEvDj6n1wnQRjMi2SERDo3c6bmN2c`
+
+There are two deposit methods; both take a single argument `amount` (u64, in the token's smallest unit):
+
+1. `depositSol`: deposit the native token (SOL).
+2. `depositToken`: deposit an SPL token (e.g. USDT).
+
+**depositSol accounts:**
+
+| Account | isSigner | isMut | Description |
+|---------|----------|-------|-------------|
+| signer | true | true | The depositor's wallet address; the deposited asset is credited to this address |
+| admin | false | false | Admin account |
+| solVault | false | true | SOL vault account |
+| systemProgram | false | false | Fixed: `11111111111111111111111111111111` |
+
+**depositToken accounts:**
+
+| Account | isSigner | isMut | Description |
+|---------|----------|-------|-------------|
+| signer | true | false | The depositor's wallet address; the deposited asset is credited to this address |
+| admin | false | false | Admin account |
+| bank | false | false | Bank account of the token |
+| tokenVaultAuthority | false | false | Token vault authority |
+| tokenVault | false | true | Token vault account |
+| depositor | false | true | The depositor's associated token account of `tokenMint` |
+| tokenMint | false | false | Token mint address |
+| tokenProgram | false | false | Fixed: `TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA` |
+| associatedTokenProgram | false | false | Fixed: `ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL` |
+| systemProgram | false | false | Fixed: `11111111111111111111111111111111` |
+
+* Target account: for both methods, append the `programId` account (the program address) as the **last** account of the instruction to deposit to the **spot** account; omit it to deposit to the **futures** account.
+
+### SUI
+
+On SUI, only the **spot** account is supported. Deposits are made by transferring the asset directly to your dedicated deposit address — no contract call is required:
+
+1. Call [Get User Deposit Address (USER_DATA)](#get-user-deposit-address-user_data) to get your deposit address on SUI.
+2. Transfer the asset directly to that address; once the transaction is confirmed on-chain, it is credited to your spot account.
+
+### Get User Deposit Address (USER_DATA)
+
+> **Response:**
+
+```javascript
+{
+    "network": "SUI",
+    "address": "0x9a40f0119b670fb6b155744b51981f91c4c4c8a20c333441a63853fe7d055c90"
+}
+```
+
+`GET /aster-chain/v3/spot/user-deposit-address`
+
+Query the current user's dedicated deposit address on the specified network. Only the spot account is supported.
+
+**Weight:** 1
+
+**Parameters:**
+
+| Name | Type | Mandatory | Description |
+|------|------|-----------|-------------|
+| network | STRING | NO | Network type. Default: `"SUI"` |
+
+---
+
+## Aster-Chain Perp Withdraw & Transfer Endpoints
+
+### User Withdraw (WITHDRAW)
+
+> **Response:**
+
+```javascript
+{
+    "withdrawId": "987654321",
+    "hash": "0xabc123..."
+}
+```
+
+`POST /aster-chain/v3/perp/user-withdraw`
+
+Submit a withdrawal request from the perp account to an on-chain address.
+
+**Weight:** 5
+
+**Parameters:**
+
+| Name | Type | Mandatory | Description |
+|------|------|-----------|-------------|
+| asset | STRING | YES | Asset name (e.g. `"USDT"`) |
+| chainId | INTEGER | YES | Target chain ID |
+| amount | STRING | YES | Withdrawal amount |
+| fee | STRING | YES | Withdrawal fee |
+| receiver | STRING | YES | Recipient on-chain address |
+| userNonce | STRING | YES | User-side nonce included in the signature |
+| signatureType | STRING | NO | Signature type: `"EOA"` or `"SafeWallet"`. Default: `"EOA"`. Pass `"SafeWallet"` if the account is a Safe wallet |
+| userSignature | STRING | YES | User signature over the withdrawal parameters. When `signatureType=SafeWallet`, multiple signatures are supported, separated by commas |
+
+---
+
+### User Solana Withdraw (WITHDRAW)
+
+> **Response:**
+
+```javascript
+{
+    "withdrawId": "987654321",
+    "hash": "0xabc123..."
+}
+```
+
+`POST /aster-chain/v3/perp/user-solana-withdraw`
+
+Submit a withdrawal request from the perp account to a Solana address.
+
+**Weight:** 5
+
+**Parameters:**
+
+| Name | Type | Mandatory | Description |
+|------|------|-----------|-------------|
+| asset | STRING | YES | Asset name (e.g. `"USDT"`) |
+| chainId | INTEGER | YES | Target chain ID |
+| amount | STRING | YES | Withdrawal amount |
+| fee | STRING | YES | Withdrawal fee |
+| receiver | STRING | YES | Recipient Solana address |
+| userNonce | STRING | YES | User-side nonce included in the signature |
+| userSignature | STRING | YES | User signature over the withdrawal parameters |
+
+---
+
+### Get Withdraw Info (USER_DATA)
+
+> **Response:**
+
+```javascript
+{
+    "userDailyLimit": "10000",
+    "userRemainingDailyLimit": "9500",
+    "totalDailyLimit": "100000",
+    "totalRemainingDailyLimit": "95000",
+    "balances": {
+        "USDT": {
+            "currency": "USDT",
+            "spotTotalWithdrawAmount": "0",
+            "perpTotalWithdrawAmount": "500",
+            "dailyLimit": "5000",
+            "chainBalances": {
+                "1": {
+                    "chainId": 1,
+                    "spotMaxWithdrawAmount": "1000",
+                    "perpMaxWithdrawAmount": "4500",
+                    "chainLimit": "5000",
+                    "withdrawFee": "0.5"
+                }
+            }
+        }
+    }
+}
+```
+
+`GET /aster-chain/v3/perp/user-withdraw-info`
+
+Query the current user's withdrawal limits and available balances per asset and chain.
+
+**Weight:** 1
+
+**Parameters:**
+
+None
+
+---
+
+### Deposit/Withdraw History (USER_DATA)
+
+> **Response:**
+
+```javascript
+[
+    {
+        "id": "12345",
+        "type": "WITHDRAW",   // "DEPOSIT" or "WITHDRAW"
+        "asset": "USDT",
+        "amount": "100",
+        "state": "COMPLETED",
+        "txHash": "0xabc123...",
+        "time": 1699900800000,
+        "chainId": 1,
+        "accountType": "perp"
+    }
+]
+```
+
+`GET /aster-chain/v3/perp/deposit-withdraw-history`
+
+Query the deposit and withdrawal history for the current user's perp account.
+
+**Weight:** 5
+
+**Parameters:**
+
+| Name | Type | Mandatory | Description |
+|------|------|-----------|-------------|
+| chainId | STRING | NO | Filter records by chain ID |
+
+---
+
+### Wallet Transfer (TRADE)
+
+> **Response:**
+
+```javascript
+{
+    "tranId": 123456789,
+    "status": "SUCCESS"
+}
+```
+
+`POST /aster-chain/v3/perp/wallet/transfer`
+
+Transfer assets between the spot wallet and the perp account.
+
+**Weight:** 5
+
+**Parameters:**
+
+| Name | Type | Mandatory | Description |
+|------|------|-----------|-------------|
+| asset | STRING | YES | Asset name (e.g. `"USDT"`) |
+| amount | DECIMAL | YES | Transfer amount, must be greater than 0 |
+| clientTranId | STRING | YES | Client-defined transfer ID |
+| kindType | STRING | YES | Transfer direction: `"SPOT_FUTURE"` (spot → perp) or `"FUTURE_SPOT"` (perp → spot) |
+| nonce | LONG | YES | Microsecond timestamp |
+| user | STRING | YES | Source account wallet address |
+| signature | STRING | YES | EIP-712 signature, signed with the `user` account's wallet private key |
+
+---
+
+## Aster-Chain Spot Withdraw & Transfer Endpoints
+
+### User Withdraw (WITHDRAW)
+
+> **Response:**
+
+```javascript
+{
+    "withdrawId": "987654321",
+    "hash": "0xabc123..."
+}
+```
+
+`POST /aster-chain/v3/spot/user-withdraw`
+
+Submit a withdrawal request from the spot account to an on-chain address.
+
+**Weight:** 5
+
+**Parameters:**
+
+| Name | Type | Mandatory | Description |
+|------|------|-----------|-------------|
+| asset | STRING | YES | Asset name (e.g. `"USDT"`) |
+| chainId | INTEGER | YES | Chain ID of the chain the asset belongs to |
+| signatureChainId | INTEGER | NO | Chain ID of the chain used for signing (the `chainId` field of the EIP-712 domain). Defaults to `chainId` |
+| amount | STRING | YES | Withdrawal amount |
+| fee | STRING | YES | Withdrawal fee |
+| receiver | STRING | YES | Recipient on-chain address |
+| userNonce | STRING | YES | User-side nonce included in the signature |
+| signatureType | STRING | NO | Signature type: `"EOA"` or `"SafeWallet"`. Default: `"EOA"`. Pass `"SafeWallet"` if the account is a Safe wallet |
+| userSignature | STRING | YES | User signature over the withdrawal parameters. When `signatureType=SafeWallet`, multiple signatures are supported, separated by commas |
+
+---
+
+### User Solana Withdraw (WITHDRAW)
+
+> **Response:**
+
+```javascript
+{
+    "withdrawId": "987654321",
+    "hash": "0xabc123..."
+}
+```
+
+`POST /aster-chain/v3/spot/user-solana-withdraw`
+
+Submit a withdrawal request from the spot account to a Solana address.
+
+**Weight:** 5
+
+**Parameters:**
+
+| Name | Type | Mandatory | Description |
+|------|------|-----------|-------------|
+| asset | STRING | YES | Asset name (e.g. `"USDT"`) |
+| chainId | INTEGER | YES | Target chain ID |
+| amount | DECIMAL | YES | Withdrawal amount |
+| fee | DECIMAL | YES | Withdrawal fee |
+| receiver | STRING | YES | Recipient Solana address |
+| userNonce | STRING | YES | User-side nonce included in the signature |
+| userSignature | STRING | YES | User signature over the withdrawal parameters |
+
+---
+
+### Wallet Transfer (TRADE)
+
+> **Response:**
+
+```javascript
+{
+    "tranId": 123456789,
+    "status": "SUCCESS"
+}
+```
+
+`POST /aster-chain/v3/spot/wallet/transfer`
+
+Transfer assets between the spot wallet and the perp account.
+
+**Weight:** 5
+
+**Parameters:**
+
+| Name | Type | Mandatory | Description |
+|------|------|-----------|-------------|
+| asset | STRING | YES | Asset name (e.g. `"USDT"`) |
+| amount | DECIMAL | YES | Transfer amount, must be greater than 0 |
+| clientTranId | STRING | YES | Client-defined transfer ID |
+| kindType | STRING | YES | Transfer direction: `"SPOT_FUTURE"` (spot → perp) or `"FUTURE_SPOT"` (perp → spot) |
+| nonce | LONG | YES | Microsecond timestamp |
+| user | STRING | YES | Source account wallet address |
+| signature | STRING | YES | EIP-712 signature, signed with the `user` account's wallet private key |
+
+---
+
+## Aster-Chain Withdraw Endpoints
+
+### Estimate Withdraw Fee (NONE)
+
+> **Response:**
+
+```javascript
+{
+    "gasPrice": 1000000000,
+    "gasLimit": 21000,
+    "nativePrice": "1800.00",
+    "tokenPrice": "1.00",
+    "gasCost": "0.000021",
+    "gasUsdValue": "0.038"
+}
+```
+
+`GET /aster-chain/v3/withdraw/estimateFee`
+
+Estimate the gas fee for a withdrawal on the specified chain and asset.
+
+**Weight:** 1
+
+**Parameters:**
+
+| Name | Type | Mandatory | Description |
+|------|------|-----------|-------------|
+| chainId | INTEGER | YES | Target chain ID |
+| asset | STRING | YES | Asset name (e.g. `"USDT"`) |
