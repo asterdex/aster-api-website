@@ -1,3 +1,14 @@
+<aside class="warning">
+<strong>重要：V3 API 访问要求更新</strong><br><br>
+自 <strong>2026 年 9 月 7 日 00:00 UTC</strong> 起，Aster Spot V3 和 Futures V3 中需要身份鉴权的业务接口，仅可在关联主钱包完成入金后访问。<br><br>
+如果主钱包尚未完成入金，请求可能返回：<br>
+<code>{"code":-5050,"msg":"This function can only be used after deposit"}</code><br><br>
+此限制<strong>不</strong>适用于：<br>
+&bull; 公共行情接口<br>
+&bull; Agent Wallet 创建、查询、更新及删除接口<br>
+&bull; Builder 创建、授权、查询、更新及删除接口
+</aside>
+
 ## **Rest 基本信息**
 
 * 接口可能需要用户的AGENT

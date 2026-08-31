@@ -1,3 +1,14 @@
+<aside class="warning">
+<strong>Important: V3 API Access Requirement Update</strong><br><br>
+Effective from <strong>September 7, 2026 at 00:00 UTC</strong>, authenticated business endpoints under Aster Spot V3 and Futures V3 can only be accessed after the primary wallet associated with the Aster account has completed a deposit.<br><br>
+If the primary wallet has not completed a deposit, the request may return:<br>
+<code>{"code":-5050,"msg":"This function can only be used after deposit"}</code><br><br>
+This requirement does <strong>not</strong> apply to:<br>
+&bull; Public market data endpoints<br>
+&bull; Agent Wallet create, query, update, and delete endpoints<br>
+&bull; Builder create, approval, query, update, and delete endpoints
+</aside>
+
 ## **Spot API Overview**
 
 * This document lists the base URL for the API endpoints: [**https://sapi.asterdex.com**](https://sapi.asterdex.com)  
