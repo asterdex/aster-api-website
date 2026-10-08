@@ -8,7 +8,6 @@
 * 在具有有效`listenKey`的帐户上执行`POST`将返回当前有效的`listenKey`并将其有效期延长60分钟
 * 本篇所列出的websocket接口baseurl: **wss://fstream.asterdex.com**
 * 订阅账户数据流的stream名称为 **/ws/\<listenKey\>**
-* 每个链接有效期不超过24小时，请妥善处理断线重连。
 * 账户数据流的消息**不保证**严格时间序; **请使用 E 字段进行排序**
 * 考虑到剧烈行情下, RESTful接口可能存在查询延迟，我们强烈建议您优先从Websocket user data stream推送的消息来获取订单，仓位等信息。
 

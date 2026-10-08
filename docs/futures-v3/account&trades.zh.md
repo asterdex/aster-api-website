@@ -164,6 +164,37 @@ GET /fapi/v3/multiAssetsMargin
    名称    |  类型  | 是否必需 |       描述
 ---------- | ------ | -------- | -----------------
 
+## **资产兑换 (TRADE)**
+
+> **响应:**
+
+```javascript
+{
+  "accountId": 123456,
+  "asset": "USDT",      // 兑换后余额发生变动的资产
+  "balance": "100.50",  // 兑换后该资产的钱包余额
+  "updateTime": 1774077572319
+}
+```
+
+``POST /fapi/v3/assetExchange``
+
+在联合保证金模式下手动触发账户的资产兑换（等同于阈值为 0 的自动资产兑换）。
+
+**权重:**
+1
+
+**参数:**
+
+| 名称      | 类型   | 是否必需 | 描述                     |
+| --------- | ------ | -------- | ------------------------ |
+| signer    | STRING | YES      | API钱包地址              |
+| nonce     | LONG   | YES      | 微秒级时间戳             |
+| signature | STRING | YES      | 签名                     |
+
+* 无需业务参数，只需传入上述通用鉴权参数。
+* 仅在联合保证金模式下可用，否则返回 `-4212` "User can not asset exchange while not in joint margin mode"。
+* 若本次未发生兑换，响应体为空。
 
 ## **下单 (TRADE)**
 
@@ -194,7 +225,9 @@ GET /fapi/v3/multiAssetsMargin
   	"priceRate": "0.3",	// 跟踪止损回调比例, 仅`TRAILING_STOP_MARKET` 订单返回此字段
  	"updateTime": 1566818724722, // 更新时间
  	"workingType": "CONTRACT_PRICE", // 条件价格触发类型
- 	"priceProtect": false            // 是否开启条件单触发保护
+ 	"priceProtect": false,           // 是否开启条件单触发保护
+ 	"pegPriceType": "",              // BBO peg 模式，仅 peg 订单返回
+ 	"stpMode": ""                    // 自成交防止（STP）模式，仅设置了该字段的订单返回
 }
 ```
 
@@ -203,7 +236,7 @@ POST /fapi/v3/order
 ``
 
 **权重:**
-1
+0
 
 **参数:**
 
@@ -221,7 +254,7 @@ stopPrice        | DECIMAL | NO       | 触发价, 仅 `STOP`, `STOP_MARKET`, `T
 closePosition    | STRING  | NO       | `true`, `false`；触发后全部平仓，仅支持`STOP_MARKET`和`TAKE_PROFIT_MARKET`；不与`quantity`合用；自带只平仓效果，不与`reduceOnly` 合用
 activationPrice  | DECIMAL | NO       | 追踪止损激活价格，仅`TRAILING_STOP_MARKET` 需要此参数, 默认为下单当前市场价格(支持不同`workingType`)
 callbackRate     | DECIMAL | NO       | 追踪止损回调比例，可取值范围[0.1, 5],其中 1代表1% ,仅`TRAILING_STOP_MARKET` 需要此参数
-timeInForce      | ENUM    | NO       | 有效方法
+timeInForce      | ENUM    | NO       | [有效方法](#枚举定义)
 workingType      | ENUM    | NO       | stopPrice 触发类型: `MARK_PRICE`(标记价格), `CONTRACT_PRICE`(合约最新价). 默认 `CONTRACT_PRICE`
 priceProtect | STRING | NO | 条件单触发保护："TRUE","FALSE", 默认"FALSE". 仅 `STOP`, `STOP_MARKET`, `TAKE_PROFIT`, `TAKE_PROFIT_MARKET` 需要此参数
 newOrderRespType | ENUM    | NO       | "ACK", "RESULT", 默认 "ACK"
@@ -241,6 +274,10 @@ Type                 |           强制要求的参数
 
 
 
+* 订单类型为 `STOP`, 参数 `timeInForce` 可以传（默认 `GTC`）。
+* 订单类型为 `TAKE_PROFIT`, 参数 `timeInForce` 可以传（默认 `GTC`）。
+* 对于 `STOP_MARKET`, `TAKE_PROFIT_MARKET`, `TRAILING_STOP_MARKET`：若传入 `timeInForce`，只接受 `GTC`，传入其他值将被拒绝。
+* 传入与所选 `type` 不匹配的参数（如 `LIMIT` 携带 `stopPrice`；`MARKET` 携带 `timeInForce`、`price` 或 `stopPrice`；`STOP_MARKET`/`TAKE_PROFIT_MARKET` 携带 `price`）会返回错误 (`PARAM_NOT_REQUIRED`)，而不是被静默忽略。
 * 条件单的触发必须:
 	
 	* 如果订单参数`priceProtect`为true:
@@ -343,8 +380,9 @@ PUT /fapi/v3/order ``
 orderId | LONG | NO |系统订单号
 origClientOrderId | STRING | NO | 用户自定义的订单号
 symbol | STRING | YES| 交易对
-quantity | DECIMAL| NO | 下单数量
-price | DECIMAL | NO | 委托价格
+side | ENUM | NO | 可选的订单方向；若传入，会与订单实际方向进行校验。
+quantity | DECIMAL| YES | 下单数量
+price | DECIMAL | YES | 委托价格
 
 * orderId 与 origClientOrderId 必须至少发送一个，同时发送则以 order id为准
 * quantity 与 price 均必须发送
@@ -398,7 +436,7 @@ price | DECIMAL | NO | 委托价格
 | chaseOffsetType    | STRING  | NO         | `ABSOLUTE`（默认）。v1 仅支持 `ABSOLUTE`。`PERCENTAGE` 后续支持。                                                                                                  |
 | maxChaseOffset     | DECIMAL | NO         | 相对原始 BBO 允许偏移的最大距离，超出后追单自动撤销。必须 > 0。若不传，则不应用基于距离的自动撤销，且所传的 `maxChaseOffsetType` 将被忽略。                          |
 | maxChaseOffsetType | STRING  | NO         | `ABSOLUTE` 或 `PERCENTAGE`（默认 `ABSOLUTE`）。`ABSOLUTE`：同价格单位，必须为 `tickSize` 倍数；`PERCENTAGE`：≤ 2 位小数。                                            |
-| timeInForce        | ENUM    | NO         | 默认 `GTX`（post-only）。**不允许 `NO_FILL`**，否则返回 `INVALID_TIF`。                                                                                            |
+| timeInForce        | ENUM    | NO         | 默认 `GTX`（post-only）。**不允许 `NO_FILL`**，否则返回 `INVALID_TIF`。详见[枚举定义：有效方式](#枚举定义)。                                                         |
 | clientStrategyId   | STRING  | NO         | 用户自定义策略 id。未传则自动生成。**长度 ≤ 28 字符**（DB 字段为 `varchar(28)`）。须满足 `^[\.A-Z\:/a-z0-9_-]{1,28}$`。                                              |
 
 **校验规则:**
@@ -490,7 +528,7 @@ newClientOrderId | STRING  | NO       | 用户自定义的订单号，不可以�
 stopPrice        | DECIMAL | NO       | 触发价, 仅 `STOP`, `STOP_MARKET`, `TAKE_PROFIT`, `TAKE_PROFIT_MARKET` 需要此参数
 activationPrice  | DECIMAL | NO       | 追踪止损激活价格，仅`TRAILING_STOP_MARKET` 需要此参数, 默认为下单当前市场价格(支持不同`workingType`)
 callbackRate     | DECIMAL | NO       | 追踪止损回调比例，可取值范围[0.1, 4],其中 1代表1% ,仅`TRAILING_STOP_MARKET` 需要此参数
-timeInForce      | ENUM    | NO       | 有效方法
+timeInForce      | ENUM    | NO       | [有效方法](#枚举定义)
 workingType      | ENUM    | NO       | stopPrice 触发类型: `MARK_PRICE`(标记价格), `CONTRACT_PRICE`(合约最新价). 默认 `CONTRACT_PRICE`
 priceProtect | STRING | NO | 条件单触发保护："TRUE","FALSE", 默认"FALSE". 仅 `STOP`, `STOP_MARKET`, `TAKE_PROFIT`, `TAKE_PROFIT_MARKET` 需要此参数
 newOrderRespType | ENUM    | NO       | "ACK", "RESULT", 默认 "ACK"
@@ -519,7 +557,7 @@ POST /fapi/v3/asset/wallet/transfer  (TRANSFER)
 ``
 
 **权重:**
-5
+50
 
 **参数:**
 
@@ -1118,7 +1156,7 @@ GET /fapi/v3/allOrders
 
    名称    |  类型  | 是否必需 |                      描述
 ---------- | ------ | -------- | -----------------------------------------------
-symbol     | STRING | YES      | 交易对
+symbol     | STRING | NO       | 若省略，则返回所有交易对的订单
 orderId    | LONG   | NO       | 只返回此orderID及之后的订单，缺省返回最近的订单
 startTime  | LONG   | NO       | 起始时间
 endTime    | LONG   | NO       | 结束时间
@@ -1236,6 +1274,8 @@ GET /fapi/v3/balance
 		   	"maxNotional": "250000",  // 当前杠杆下用户可用的最大名义价值
 		   	"positionSide": "BOTH",  // 持仓方向
 		   	"positionAmt": "0",		 // 持仓数量
+		   	"notional": "0",			// 持仓名义价值
+		   	"isolatedWallet": "0",		// 逐仓账户余额
 		   	"updateTime": 0         // 更新时间 
 		}
   	]
@@ -1246,6 +1286,8 @@ GET /fapi/v3/balance
 ``
 GET /fapi/v3/accountWithJoinMargin 
 ``
+
+* 另有一个不含联合保证金的独立接口 `GET /fapi/v3/account`（响应结构和权重相同，joinMargin=false）；如需本节描述的联合保证金视图，请使用 `accountWithJoinMargin`。
 
 **权重:**
 5
@@ -1345,6 +1387,7 @@ symbol     | STRING  | YES      | 交易对
 positionSide| ENUM   | NO		  | 持仓方向，单向持仓模式下非必填，默认且仅可填`BOTH`;在双向持仓模式下必填,且仅可选择 `LONG` 或 `SHORT` 
 amount     | DECIMAL | YES      | 保证金资金
 type       | INT     | YES      | 调整方向 1: 增加逐仓保证金，2: 减少逐仓保证金
+clientTranId | STRING | NO      | 幂等键，最长64字符；同一账户/交易对在7天内使用相同 clientTranId 的请求会被视为重复请求并拒绝
 
 * 只针对逐仓symbol 与 positionSide(如有)
 
@@ -1361,7 +1404,9 @@ type       | INT     | YES      | 调整方向 1: 增加逐仓保证金，2: 减
 	  	"symbol": "BTCUSDT", // 交易对
 	  	"time": 1578047897183, // 时间
 	  	"type": 1，	// 调整方向
-	  	"positionSide": "BOTH"  // 持仓方向
+	  	"positionSide": "BOTH",  // 持仓方向
+	  	"deltaType": "TRADE",
+	  	"clientTranId": ""
 	},
 	{
 		"amount": "100",
@@ -1417,6 +1462,8 @@ limit      | INT    | NO       | 返回的结果集数量 默认值: 500
   		"symbol": "BTCUSDT", // 交易对
   		"unRealizedProfit": "0.00000000", // 持仓未实现盈亏
   		"positionSide": "BOTH", // 持仓方向
+  		"notional": "0.00000000", // 持仓名义价值
+  		"isolatedWallet": "0.00000000", // 逐仓账户余额
   		"updateTime": 1625474304765   // 更新时间
   	}
 ]
@@ -1439,6 +1486,8 @@ limit      | INT    | NO       | 返回的结果集数量 默认值: 500
   		"symbol": "BTCUSDT", // 交易对
   		"unRealizedProfit": "2316.83423560" // 持仓未实现盈亏
   		"positionSide": "LONG", // 持仓方向
+  		"notional": "133590.13423560",
+  		"isolatedWallet": "15517.54150468",
   		"updateTime": 1625474304765  // 更新时间
   	},
   	{
@@ -1454,6 +1503,8 @@ limit      | INT    | NO       | 返回的结果集数量 默认值: 500
   		"symbol": "BTCUSDT", // 交易对
   		"unRealizedProfit": "-1156.46711780" // 持仓未实现盈亏
   		"positionSide": "SHORT", // 持仓方向
+  		"notional": "-66795.0671178",
+  		"isolatedWallet": "5413.95799991",
   		"updateTime": 1625474304765  //更新时间
   	}  	
 ]
@@ -1519,6 +1570,7 @@ GET /fapi/v3/userTrades
    名称    |  类型  | 是否必需 |                     描述
 ---------- | ------ | -------- | --------------------------------------------
 symbol     | STRING | YES      | 交易对
+orderId    | LONG   | NO       | 筛选属于该订单号的成交记录
 startTime  | LONG   | NO       | 起始时间
 endTime    | LONG   | NO       | 结束时间
 fromId     | LONG   | NO       | 返回该fromId及之后的成交，缺省返回最近的成交
@@ -1569,7 +1621,7 @@ GET /fapi/v3/income
    名称    |  类型  | 是否必需 |                                              描述
 ---------- | ------ | -------- | -----------------------------------------------------------------------------------------------
 symbol     | STRING | NO       | 交易对
-incomeType | STRING | NO       | 收益类型 "TRANSFER"，"WELCOME_BONUS", "REALIZED_PNL"，"FUNDING_FEE", "COMMISSION", "INSURANCE_CLEAR", and "MARKET_MERCHANT_RETURN_REWARD"
+incomeType | STRING | NO       | 收益类型 "TRANSFER"，"WELCOME_BONUS", "REALIZED_PNL"，"FUNDING_FEE", "COMMISSION", "INSURANCE_CLEAR", "MARKET_MERCHANT_RETURN_REWARD", "REFERRAL_KICKBACK", "COMMISSION_REBATE", "MARKET_MAKER_REBATE", "API_REBATE", "CONTEST_REWARD", "CROSS_COLLATERAL_TRANSFER", "INTERNAL_TRANSFER", and "AUTO_EXCHANGE"
 startTime  | LONG   | NO       | 起始时间
 endTime    | LONG   | NO       | 结束时间
 limit      | INT    | NO       | 返回的结果集数量 默认值:100 最大值:1000
@@ -1623,9 +1675,10 @@ limit      | INT    | NO       | 返回的结果集数量 默认值:100 最大�
 
 
 ``
-GET /fapi/v3/leverageBracket
+GET /fapi/v3/leverageBrackets
 ``
 
+*注意：`GET /fapi/v3/leverageBracket`（单数）已废弃，但仍可使用；推荐使用 `GET /fapi/v3/leverageBrackets`（复数）作为主要维护路径。*
 
 **权重:** 1
 
@@ -1935,7 +1988,7 @@ symbol | STRING | YES
 | quantity | STRING | YES* | 委托数量。`closePosition=true` 时可不填 |
 | price | STRING | YES* | `LIMIT`、`STOP`、`TAKE_PROFIT` 时必填 |
 | stopPrice | STRING | YES* | `STOP`、`STOP_MARKET`、`TAKE_PROFIT`、`TAKE_PROFIT_MARKET` 时必填 |
-| timeInForce | STRING | YES* | `LIMIT` 时必填；止损类订单可选（默认 `GTC`）。不支持 `IOC` 和 `FOK` |
+| timeInForce | STRING | YES* | `LIMIT` 时必填；止损类订单可选（默认 `GTC`）。不支持 `IOC` 和 `FOK`。详见[枚举定义：有效方式](#枚举定义) |
 | workingType | STRING | NO | `CONTRACT_PRICE` 或 `MARK_PRICE`，默认 `CONTRACT_PRICE` |
 | reduceOnly | STRING | NO | 是否仅减仓 |
 | closePosition | STRING | NO | 是否全部平仓 |
@@ -1999,7 +2052,7 @@ symbol | STRING | YES
 | quantity | STRING | NO | 新委托数量 |
 | price | STRING | NO | 新价格（适用于 `LIMIT`、`STOP`、`TAKE_PROFIT`） |
 | stopPrice | STRING | NO | 新止损价 |
-| timeInForce | STRING | NO | 新的有效方式 |
+| timeInForce | STRING | NO | 新的[有效方式](#枚举定义) |
 | workingType | STRING | NO | 新的触发价格类型 |
 | reduceOnly | STRING | NO | |
 | closePosition | STRING | NO | |
@@ -2812,6 +2865,408 @@ typed_data = {
 
 ---
 
+## **查询Builder用户账户信息 (USER_DATA)**
+
+> **响应:**
+
+```javascript
+{
+  "total": 1,
+  "currentPage": 1,
+  "totalPages": 1,
+  "pageSize": 50,
+  "hasMore": false,
+  "rows": [
+    {
+      "address": "0x1234...abcd",
+      "feeTier": 0,
+      "canTrade": true,
+      "canDeposit": true,
+      "canWithdraw": true,
+      "updateTime": 1751500000000,
+      "accountType": 0,
+      "dualSidePosition": false,
+      "jointMargin": false,
+      "feeBurn": false,
+      "feeBurnAssetId": 0,
+      "symbolConfig": [
+        {
+          "symbol": "BTCUSDT",
+          "leverage": 20,
+          "notionalLimitCoef": "10"
+        }
+      ]
+    }
+  ]
+}
+```
+
+`GET /fapi/v3/builder/userAccounts`
+
+分页查询在当前调用者的Builder代码下交易的用户账户信息。以已认证账户本身作为Builder身份，无需单独传入`builder`地址参数。
+
+**权重:** 5
+
+**参数:**
+
+| 名称 | 类型 | 是否必需 | 描述 |
+|------|------|---------|------|
+| userAddresses | STRING | NO | 逗号分隔的用户钱包地址列表，最多50个 |
+| symbol | STRING | NO | 传入时，`symbolConfig` 中仅返回该交易对的配置 |
+| page | INT | NO | 页码，从 `1` 开始。默认: `1` |
+| limit | INT | NO | 每页返回数量。默认 `50`；最大 `1000` |
+| nonce | LONG | YES | 微秒级时间戳，用于防重放攻击 |
+| signer | STRING | YES | 与当前认证账户关联的 signer 地址 |
+| signature | STRING | YES | 对请求体的签名 |
+
+* 如果传入 `userAddresses`，仅返回这些地址的信息；每个地址必须已将调用者地址授权为其Builder，否则该地址不会出现在 `rows` 中，而是记录在 `errors` 里。
+* 如果不传 `userAddresses`，则分页返回当前绑定到该Builder的全部用户，按绑定时间先后排序。
+* `userAddresses` 每次请求最多支持50个地址，超出则请求被拒绝。
+* 调用者自身账户必须已生成链上地址（即已完成过至少一次充值），否则请求会被拒绝。
+
+**响应字段:**
+
+| 字段 | 类型 | 描述 |
+|------|------|------|
+| total | LONG | 符合条件的用户总数 |
+| currentPage | INT | 当前页码 |
+| totalPages | INT | 总页数 |
+| pageSize | INT | 每页数量 |
+| hasMore | BOOLEAN | 是否还有下一页 |
+| rows | ARRAY | 账户记录列表 |
+| rows[].address | STRING | 用户钱包地址 |
+| rows[].feeTier | INT | 账户手续费等级 |
+| rows[].canTrade | BOOLEAN | 是否可交易 |
+| rows[].canDeposit | BOOLEAN | 是否可充值 |
+| rows[].canWithdraw | BOOLEAN | 是否可提现 |
+| rows[].updateTime | LONG | 最后更新时间（毫秒） |
+| rows[].accountType | INT | 账户类型 |
+| rows[].dualSidePosition | BOOLEAN | 是否为双向持仓模式 |
+| rows[].jointMargin | BOOLEAN | 是否开启联合保证金模式 |
+| rows[].feeBurn | BOOLEAN | 是否开启手续费销毁 |
+| rows[].feeBurnAssetId | INT | 手续费销毁资产ID |
+| rows[].symbolConfig | ARRAY | 各交易对配置 |
+| rows[].symbolConfig[].symbol | STRING | 交易对 |
+| rows[].symbolConfig[].leverage | INT | 当前初始杠杆 |
+| rows[].symbolConfig[].notionalLimitCoef | STRING | 名义价值限制系数 |
+| errors | ARRAY | 仅当部分请求地址无法返回时才出现 |
+| errors[].address | STRING | 未出现在 `rows` 中的地址 |
+| errors[].errorMsg | STRING | 该地址被排除的原因：`This function can only be used after deposit`、`User privacy mode is enabled, this operation is not allowed.`、`Failed to check privacy switch status for this address.` 或 `This user address is not bound to this builder.`（仅在显式传入 `userAddresses` 时可能出现） |
+
+---
+
+## **查询Builder用户当前挂单 (USER_DATA)**
+
+> **响应:**
+
+```javascript
+{
+  "total": 1,
+  "currentPage": 1,
+  "totalPages": 1,
+  "pageSize": 50,
+  "hasMore": false,
+  "rows": [
+    {
+      "address": "0x1234...abcd",
+      "symbol": "BTCUSDT",
+      "orderId": 1917641,
+      "clientOrderId": "abc",
+      "price": "0",
+      "origQty": "0.40",
+      "executedQty": "0",
+      "avgPrice": "0.00000",
+      "stopPrice": "9300",
+      "status": "NEW",
+      "side": "BUY",
+      "positionSide": "SHORT",
+      "type": "TRAILING_STOP_MARKET",
+      "timeInForce": "GTC",
+      "time": 1579276756075,
+      "workingType": "CONTRACT_PRICE"
+    }
+  ]
+}
+```
+
+`GET /fapi/v3/builder/userOpenOrders`
+
+分页查询在当前调用者的Builder代码下交易的用户当前挂单。以已认证账户本身作为Builder身份，无需单独传入`builder`地址参数。
+
+**权重:** 5
+
+**参数:**
+
+| 名称 | 类型 | 是否必需 | 描述 |
+|------|------|---------|------|
+| userAddresses | STRING | NO | 逗号分隔的用户钱包地址列表，最多50个 |
+| symbol | STRING | NO | 传入时，仅返回该交易对的挂单 |
+| page | INT | NO | 页码，从 `1` 开始。默认: `1` |
+| limit | INT | NO | 每页返回数量。默认 `50`；最大 `1000` |
+| nonce | LONG | YES | 微秒级时间戳，用于防重放攻击 |
+| signer | STRING | YES | 与当前认证账户关联的 signer 地址 |
+| signature | STRING | YES | 对请求体的签名 |
+
+* 如果传入 `userAddresses`，仅返回这些地址的挂单；每个地址必须已将调用者地址授权为其Builder，否则该地址不会出现在 `rows` 中，而是记录在 `errors` 里。
+* 如果不传 `userAddresses`，则分页返回当前绑定到该Builder的全部用户的挂单，用户按绑定时间先后排序。
+* `userAddresses` 每次请求最多支持50个地址，超出则请求被拒绝。
+* 调用者自身账户必须已生成链上地址（即已完成过至少一次充值），否则请求会被拒绝。
+
+**响应字段:**
+
+| 字段 | 类型 | 描述 |
+|------|------|------|
+| total | LONG | 本次查询涉及的用户总数 |
+| currentPage | INT | 当前页码 |
+| totalPages | INT | 总页数 |
+| pageSize | INT | 每页数量 |
+| hasMore | BOOLEAN | 是否还有下一页 |
+| rows | ARRAY | 所有返回用户的挂单列表 |
+| rows[].address | STRING | 挂单所属用户的钱包地址 |
+| rows[].symbol | STRING | 交易对 |
+| rows[].orderId | LONG | 订单ID |
+| rows[].clientOrderId | STRING | 客户端订单ID |
+| rows[].price | STRING | 委托价格 |
+| rows[].origQty | STRING | 原始委托数量 |
+| rows[].executedQty | STRING | 已成交数量 |
+| rows[].avgPrice | STRING | 平均成交价格 |
+| rows[].stopPrice | STRING | 触发价格 |
+| rows[].status | STRING | 订单状态 |
+| rows[].side | STRING | 买卖方向 |
+| rows[].positionSide | STRING | 持仓方向：`BOTH`、`LONG`、`SHORT` |
+| rows[].type | STRING | 订单类型 |
+| rows[].timeInForce | STRING | [有效方式](#枚举定义) |
+| rows[].time | LONG | 下单时间（毫秒） |
+| rows[].workingType | STRING | 触发价格类型 |
+| errors | ARRAY | 仅当部分请求地址无法返回时才出现 |
+| errors[].address | STRING | 未出现在 `rows` 中的地址 |
+| errors[].errorMsg | STRING | 该地址被排除的原因：`This function can only be used after deposit`、`User privacy mode is enabled, this operation is not allowed.`、`Failed to check privacy switch status for this address.` 或 `This user address is not bound to this builder.`（仅在显式传入 `userAddresses` 时可能出现） |
+
+---
+
+## **查询Builder用户余额 (USER_DATA)**
+
+> **响应:**
+
+```javascript
+{
+  "total": 1,
+  "currentPage": 1,
+  "totalPages": 1,
+  "pageSize": 50,
+  "hasMore": false,
+  "rows": [
+    {
+      "address": "0x1234...abcd",
+      "asset": "USDT",
+      "walletBalance": "23.72469206",
+      "price": "1",
+      "balanceInUsd": "23.72469206"
+    }
+  ]
+}
+```
+
+`GET /fapi/v3/builder/userBalances`
+
+分页查询在当前调用者的Builder代码下交易的用户钱包余额。以已认证账户本身作为Builder身份，无需单独传入`builder`地址参数。
+
+**权重:** 5
+
+**参数:**
+
+| 名称 | 类型 | 是否必需 | 描述 |
+|------|------|---------|------|
+| userAddresses | STRING | NO | 逗号分隔的用户钱包地址列表，最多50个 |
+| page | INT | NO | 页码，从 `1` 开始。默认: `1` |
+| limit | INT | NO | 每页返回数量。默认 `50`；最大 `1000` |
+| nonce | LONG | YES | 微秒级时间戳，用于防重放攻击 |
+| signer | STRING | YES | 与当前认证账户关联的 signer 地址 |
+| signature | STRING | YES | 对请求体的签名 |
+
+* 如果传入 `userAddresses`，仅返回这些地址的余额；每个地址必须已将调用者地址授权为其Builder，否则该地址不会出现在 `rows` 中，而是记录在 `errors` 里。
+* 如果不传 `userAddresses`，则分页返回当前绑定到该Builder的全部用户，按绑定时间先后排序。
+* `userAddresses` 每次请求最多支持50个地址，超出则请求被拒绝。
+* 调用者自身账户必须已生成链上地址（即已完成过至少一次充值），否则请求会被拒绝。
+
+**响应字段:**
+
+| 字段 | 类型 | 描述 |
+|------|------|------|
+| total | LONG | 符合条件的用户总数 |
+| currentPage | INT | 当前页码 |
+| totalPages | INT | 总页数 |
+| pageSize | INT | 每页数量 |
+| hasMore | BOOLEAN | 是否还有下一页 |
+| rows | ARRAY | 所有返回用户的余额记录列表 |
+| rows[].address | STRING | 余额所属用户的钱包地址 |
+| rows[].asset | STRING | 资产名称 |
+| rows[].walletBalance | STRING | 钱包余额 |
+| rows[].price | STRING | 用于计算 `balanceInUsd` 的资产价格 |
+| rows[].balanceInUsd | STRING | 折合美元的钱包余额 |
+| errors | ARRAY | 仅当部分请求地址无法返回时才出现 |
+| errors[].address | STRING | 未出现在 `rows` 中的地址 |
+| errors[].errorMsg | STRING | 该地址被排除的原因：`This function can only be used after deposit`、`User privacy mode is enabled, this operation is not allowed.`、`Failed to check privacy switch status for this address.` 或 `This user address is not bound to this builder.`（仅在显式传入 `userAddresses` 时可能出现） |
+
+---
+
+## **查询Builder用户持仓风险 (USER_DATA)**
+
+> **响应:**
+
+```javascript
+{
+  "total": 1,
+  "currentPage": 1,
+  "totalPages": 1,
+  "pageSize": 50,
+  "hasMore": false,
+  "rows": [
+    {
+      "address": "0x1234...abcd",
+      "symbol": "BTCUSDT",
+      "positionAmt": "20.000",
+      "entryPrice": "6563.66500",
+      "markPrice": "6679.50671178",
+      "unRealizedProfit": "2316.83423560",
+      "liquidationPrice": "5930.78",
+      "leverage": "10",
+      "maxNotionalValue": "20000000",
+      "marginType": "isolated",
+      "isolatedMargin": "15517.54150468",
+      "isAutoAddMargin": "false",
+      "positionSide": "LONG",
+      "notional": "133593.13423560",
+      "isolatedWallet": "13200.70726908",
+      "updateTime": 1625474304765
+    }
+  ]
+}
+```
+
+`GET /fapi/v3/builder/userPositionRisk`
+
+分页查询在当前调用者的Builder代码下交易的用户持仓风险信息。以已认证账户本身作为Builder身份，无需单独传入`builder`地址参数。
+
+**权重:** 5
+
+**参数:**
+
+| 名称 | 类型 | 是否必需 | 描述 |
+|------|------|---------|------|
+| userAddresses | STRING | NO | 逗号分隔的用户钱包地址列表，最多50个 |
+| symbol | STRING | NO | 传入时，仅返回该交易对的持仓 |
+| page | INT | NO | 页码，从 `1` 开始。默认: `1` |
+| limit | INT | NO | 每页返回数量。默认 `50`；最大 `1000` |
+| nonce | LONG | YES | 微秒级时间戳，用于防重放攻击 |
+| signer | STRING | YES | 与当前认证账户关联的 signer 地址 |
+| signature | STRING | YES | 对请求体的签名 |
+
+* 如果传入 `userAddresses`，仅返回这些地址的持仓；每个地址必须已将调用者地址授权为其Builder，否则该地址不会出现在 `rows` 中，而是记录在 `errors` 里。
+* 如果不传 `userAddresses`，则分页返回当前绑定到该Builder的全部用户的持仓，用户按绑定时间先后排序。
+* `userAddresses` 每次请求最多支持50个地址，超出则请求被拒绝。
+* 调用者自身账户必须已生成链上地址（即已完成过至少一次充值），否则请求会被拒绝。
+* 单向持仓模式的用户仅返回 `BOTH` 方向持仓；双向持仓模式的用户返回 `LONG`/`SHORT` 方向持仓。
+* 当 `liquidationPrice` 计算结果为负数时，统一返回 `0`。
+* 本批量接口仅返回 `positionAmt` 不为零的持仓；这与单账户接口 `GET /fapi/v3/positionRisk` 不同，后者会返回包括 `positionAmt = 0` 在内的所有交易对持仓。
+
+**响应字段:**
+
+| 字段 | 类型 | 描述 |
+|------|------|------|
+| total | LONG | 本次查询涉及的用户总数 |
+| currentPage | INT | 当前页码 |
+| totalPages | INT | 总页数 |
+| pageSize | INT | 每页数量 |
+| hasMore | BOOLEAN | 是否还有下一页 |
+| rows | ARRAY | 所有返回用户的持仓记录列表 |
+| rows[].address | STRING | 持仓所属用户的钱包地址 |
+| rows[].symbol | STRING | 交易对 |
+| rows[].positionAmt | STRING | 持仓数量 |
+| rows[].entryPrice | STRING | 平均开仓价格 |
+| rows[].markPrice | STRING | 标记价格 |
+| rows[].unRealizedProfit | STRING | 未实现盈亏 |
+| rows[].liquidationPrice | STRING | 强平价格 |
+| rows[].leverage | STRING | 当前初始杠杆 |
+| rows[].maxNotionalValue | STRING | 当前杠杆下最大可用名义价值 |
+| rows[].marginType | STRING | 保证金模式：`isolated` 或 `cross` |
+| rows[].isolatedMargin | STRING | 逐仓保证金 |
+| rows[].isAutoAddMargin | STRING | 是否自动追加保证金 |
+| rows[].positionSide | STRING | 持仓方向：`BOTH`、`LONG`、`SHORT` |
+| rows[].notional | STRING | 持仓名义价值 |
+| rows[].isolatedWallet | STRING | 逐仓钱包余额 |
+| rows[].updateTime | LONG | 最后更新时间（毫秒） |
+| errors | ARRAY | 仅当部分请求地址无法返回时才出现 |
+| errors[].address | STRING | 未出现在 `rows` 中的地址 |
+| errors[].errorMsg | STRING | 该地址被排除的原因：`This function can only be used after deposit`、`User privacy mode is enabled, this operation is not allowed.`、`Failed to check privacy switch status for this address.` 或 `This user address is not bound to this builder.`（仅在显式传入 `userAddresses` 时可能出现） |
+
+---
+
+## **查询Builder用户手续费率 (USER_DATA)**
+
+> **响应:**
+
+```javascript
+{
+  "total": 1,
+  "currentPage": 1,
+  "totalPages": 1,
+  "pageSize": 50,
+  "hasMore": false,
+  "rows": [
+    {
+      "address": "0x1234...abcd",
+      "symbol": "BTCUSDT",
+      "makerCommissionRate": "0.0002",
+      "takerCommissionRate": "0.0004"
+    }
+  ]
+}
+```
+
+`GET /fapi/v3/builder/userCommissionRates`
+
+分页查询在当前调用者的Builder代码下交易的用户在指定交易对上的手续费率。以已认证账户本身作为Builder身份，无需单独传入`builder`地址参数。
+
+**权重:** 5
+
+**参数:**
+
+| 名称 | 类型 | 是否必需 | 描述 |
+|------|------|---------|------|
+| userAddresses | STRING | NO | 逗号分隔的用户钱包地址列表，最多50个 |
+| symbol | STRING | YES | 要查询手续费率的交易对 |
+| page | INT | NO | 页码，从 `1` 开始。默认: `1` |
+| limit | INT | NO | 每页返回数量。默认 `50`；最大 `1000` |
+| nonce | LONG | YES | 微秒级时间戳，用于防重放攻击 |
+| signer | STRING | YES | 与当前认证账户关联的 signer 地址 |
+| signature | STRING | YES | 对请求体的签名 |
+
+* 如果传入 `userAddresses`，仅返回这些地址的手续费率；每个地址必须已将调用者地址授权为其Builder，否则该地址不会出现在 `rows` 中，而是记录在 `errors` 里。
+* 如果不传 `userAddresses`，则分页返回当前绑定到该Builder的全部用户，按绑定时间先后排序。
+* `userAddresses` 每次请求最多支持50个地址，超出则请求被拒绝。
+* 调用者自身账户必须已生成链上地址（即已完成过至少一次充值），否则请求会被拒绝。
+
+**响应字段:**
+
+| 字段 | 类型 | 描述 |
+|------|------|------|
+| total | LONG | 符合条件的用户总数 |
+| currentPage | INT | 当前页码 |
+| totalPages | INT | 总页数 |
+| pageSize | INT | 每页数量 |
+| hasMore | BOOLEAN | 是否还有下一页 |
+| rows | ARRAY | 手续费率记录列表 |
+| rows[].address | STRING | 用户钱包地址 |
+| rows[].symbol | STRING | 交易对 |
+| rows[].makerCommissionRate | STRING | 挂单手续费率 |
+| rows[].takerCommissionRate | STRING | 吃单手续费率 |
+| errors | ARRAY | 仅当部分请求地址无法返回时才出现 |
+| errors[].address | STRING | 未出现在 `rows` 中的地址 |
+| errors[].errorMsg | STRING | 该地址被排除的原因：`This function can only be used after deposit`、`User privacy mode is enabled, this operation is not allowed.`、`Failed to check privacy switch status for this address.` 或 `This user address is not bound to this builder.`（仅在显式传入 `userAddresses` 时可能出现） |
+
+---
+
 ## **查询Builder交易记录 (USER_DATA)**
 
 > **响应:**
@@ -2838,7 +3293,7 @@ typed_data = {
       "activeBuy": false,
       "feeAsset": "USDT",
       "totalQuota": "15.63802",
-      "fee": "0.07819010",
+      "fee": "-0.07819010",
       "orderId": 25851813,
       "realizedProfit": "-0.91539999",
       "marginAsset": "USDT",
@@ -2859,6 +3314,7 @@ typed_data = {
 
 | 名称 | 类型 | 是否必需 | 描述 |
 |------|------|---------|------|
+| userAddresses | STRING | NO | 逗号分隔的用户钱包地址列表，最多50个 |
 | startTime | LONG | NO | 起始时间戳（毫秒） |
 | endTime | LONG | NO | 结束时间戳（毫秒） |
 | page | INT | NO | 页码，从 `1` 开始。默认: `1` |
@@ -2868,9 +3324,12 @@ typed_data = {
 | signature | STRING | YES | 对请求体的签名 |
 
 * 如果 `startTime` 和 `endTime` 都未发送，则返回最近7天的数据。
-* 最终生效的 `startTime` 不能早于当前时间之前30天，否则请求会被拒绝。
+* 最终生效的 `startTime` 不能早于当前时间之前90天，否则请求会被拒绝。
 * `endTime` 不能超过当前服务器时间1天以上。
 * 结果按成交时间倒序排列。
+* 如果传入 `userAddresses`，仅返回这些地址的成交记录；每个地址必须已将调用者地址授权为其Builder，否则该地址不会出现在 `rows` 中，而是记录在 `errors` 里。
+* 如果不传 `userAddresses`，则返回当前绑定到该Builder的全部用户的成交记录。
+* `userAddresses` 每次请求最多支持50个地址，超出则请求被拒绝。
 
 **响应字段:**
 
@@ -2895,12 +3354,124 @@ typed_data = {
 | rows[].activeBuy | BOOLEAN | 是否为主动买入 |
 | rows[].feeAsset | STRING | 手续费资产 |
 | rows[].totalQuota | STRING | 成交名义价值（价格 × 数量） |
-| rows[].fee | STRING | 手续费 |
+| rows[].fee | STRING | 该笔成交的手续费，以交易用户视角为准：收取手续费时为负数，收到返佣时为正数。与本响应中大多数其他小数字段不同，`fee` 不会去除末尾的零 |
 | rows[].orderId | LONG | 订单ID |
 | rows[].realizedProfit | STRING | 已实现盈亏 |
 | rows[].marginAsset | STRING | 保证金（结算）资产 |
 | rows[].userAddress | STRING | 交易用户的钱包地址 |
 | rows[].builderFee | STRING | 该笔成交收取的Builder手续费 |
+| errors | ARRAY | 仅当部分请求地址无法返回时才出现 |
+| errors[].address | STRING | 未出现在 `rows` 中的地址 |
+| errors[].errorMsg | STRING | 该地址被排除的原因：`This function can only be used after deposit`、`User privacy mode is enabled, this operation is not allowed.`、`Failed to check privacy switch status for this address.` 或 `This user address is not bound to this builder.`（仅在显式传入 `userAddresses` 时可能出现） |
+
+---
+
+## **查询Builder全部订单 (USER_DATA)**
+
+> **响应:**
+
+```javascript
+{
+  "total": 1,
+  "currentPage": 1,
+  "totalPages": 1,
+  "pageSize": 50,
+  "hasMore": false,
+  "rows": [
+    {
+      "avgPrice": "0.00000",
+      "clientOrderId": "abc",
+      "cumQuote": "0",
+      "executedQty": "0",
+      "orderId": 1917641,
+      "origQty": "0.40",
+      "origType": "TRAILING_STOP_MARKET",
+      "price": "0",
+      "reduceOnly": false,
+      "side": "BUY",
+      "positionSide": "SHORT",
+      "status": "NEW",
+      "stopPrice": "9300",
+      "closePosition": false,
+      "symbol": "BTCUSDT",
+      "time": 1579276756075,
+      "timeInForce": "GTC",
+      "type": "TRAILING_STOP_MARKET",
+      "activatePrice": "9020",
+      "priceRate": "0.3",
+      "updateTime": 1579276756075,
+      "workingType": "CONTRACT_PRICE",
+      "priceProtect": false,
+      "address": "0x1234...abcd"
+    }
+  ]
+}
+```
+
+`GET /fapi/v3/builder/userAllOrders`
+
+分页查询在当前调用者的Builder代码下交易的用户历史订单（活跃、已撤销或已成交）。以已认证账户本身作为Builder身份，无需单独传入`builder`地址参数。
+
+**权重:** 5
+
+**参数:**
+
+| 名称 | 类型 | 是否必需 | 描述 |
+|------|------|---------|------|
+| userAddresses | STRING | NO | 逗号分隔的用户钱包地址列表，最多50个 |
+| symbol | STRING | NO | 传入时，仅返回该交易对的订单 |
+| startTime | LONG | NO | 起始时间戳（毫秒） |
+| endTime | LONG | NO | 结束时间戳（毫秒） |
+| page | INT | NO | 页码，从 `1` 开始。默认: `1` |
+| limit | INT | NO | 每页返回数量。默认 `50`；最大 `1000` |
+| nonce | LONG | YES | 微秒级时间戳，用于防重放攻击 |
+| signer | STRING | YES | 与当前认证账户关联的 signer 地址 |
+| signature | STRING | YES | 对请求体的签名 |
+
+* 如果 `startTime` 和 `endTime` 都未发送，则返回最近7天的数据。
+* 最终生效的 `startTime` 不能早于当前时间之前90天，否则请求会被拒绝。
+* `endTime` 不能超过当前服务器时间1天以上。
+* 如果传入 `userAddresses`，仅返回这些地址的订单；每个地址必须已将调用者地址授权为其Builder，否则该地址不会出现在 `rows` 中，而是记录在 `errors` 里。
+* 如果不传 `userAddresses`，则返回当前绑定到该Builder的全部用户的订单。
+* `userAddresses` 每次请求最多支持50个地址，超出则请求会被拒绝。
+
+**响应字段:**
+
+| 字段 | 类型 | 描述 |
+|------|------|------|
+| total | LONG | 符合条件的订单总数 |
+| currentPage | INT | 当前页码 |
+| totalPages | INT | 总页数 |
+| pageSize | INT | 每页数量 |
+| hasMore | BOOLEAN | 是否还有下一页 |
+| rows | ARRAY | 订单记录列表 |
+| rows[].orderId | LONG | 订单ID |
+| rows[].symbol | STRING | 交易对 |
+| rows[].status | STRING | 订单状态 |
+| rows[].clientOrderId | STRING | 客户端订单ID |
+| rows[].price | STRING | 委托价格 |
+| rows[].avgPrice | STRING | 平均成交价格 |
+| rows[].origQty | STRING | 原始委托数量 |
+| rows[].executedQty | STRING | 已成交数量 |
+| rows[].cumQuote | STRING | 成交金额 |
+| rows[].timeInForce | STRING | [有效方式](#枚举定义) |
+| rows[].type | STRING | 订单类型 |
+| rows[].reduceOnly | BOOLEAN | 是否只减仓 |
+| rows[].side | STRING | 买卖方向 |
+| rows[].stopPrice | STRING | 触发价格 |
+| rows[].workingType | STRING | 触发价格类型 |
+| rows[].origType | STRING | 原始订单类型 |
+| rows[].time | LONG | 下单时间（毫秒） |
+| rows[].updateTime | LONG | 更新时间（毫秒） |
+| rows[].priceRate | STRING | 回调比例，仅 `TRAILING_STOP_MARKET` 订单返回 |
+| rows[].activatePrice | STRING | 追踪止损激活价格，仅 `TRAILING_STOP_MARKET` 订单返回 |
+| rows[].positionSide | STRING | 持仓方向：`BOTH`、`LONG`、`SHORT` |
+| rows[].closePosition | BOOLEAN | 是否为全部平仓 |
+| rows[].priceProtect | BOOLEAN | 是否开启条件单触发保护 |
+| rows[].address | STRING | 订单所属用户的钱包地址 |
+| errors | ARRAY | 仅当部分请求地址无法返回时才出现 |
+| errors[].address | STRING | 未出现在 `rows` 中的地址 |
+| errors[].errorMsg | STRING | 该地址被排除的原因：`This function can only be used after deposit`、`User privacy mode is enabled, this operation is not allowed.`、`Failed to check privacy switch status for this address.` 或 `This user address is not bound to this builder.`（仅在显式传入 `userAddresses` 时可能出现） |
 
 ---
 
@@ -2963,3 +3534,39 @@ typed_data = {
 | totalPages | INT | 总页数 |
 | pageSize | INT | 实际生效的每页数量 |
 | hasMore | BOOLEAN | 是否还有下一页 |
+
+---
+
+## **查询全部资产Logo**
+
+> **响应:**
+
+```javascript
+[
+  {
+    "assetCode": "BTC",
+    "logoUrl": "https://example.com/logo/btc.png"
+  },
+  {
+    "assetCode": "ETH",
+    "logoUrl": "https://example.com/logo/eth.png"
+  }
+]
+```
+
+`GET /fapi/v3/common/asset/all-asset-logo`
+
+查询所有生效资产的Logo地址。这是公共接口，无需鉴权。
+
+**权重:** 1
+
+**参数:**
+
+无
+
+**响应字段:**
+
+| 字段 | 类型 | 描述 |
+|------|------|------|
+| assetCode | STRING | 资产名称 |
+| logoUrl | STRING | 该资产的Logo图片地址 |

@@ -102,6 +102,8 @@
 | USER_DATA | 需要有效的 signer 和 signature |
 | USER_STREAM | 需要有效的 signer 和 signature |
 | MARKET_DATA | 不需要鉴权的接口 |
+| TRANSFER | 需要有效的 signer 和 signature |
+| WITHDRAW | 需要有效的 signer 和 signature |
 
 ## 鉴权签名载荷
 
@@ -128,7 +130,7 @@
 | signer | 0x21cF8Ae13Bb72632562c6Fff438652Ba1a151bb0 | [点击此处](https://www.asterdex-testnet.com/en/api-wallet) |
 | privateKey | 0x4fd0a42218f3eae43a6ce26d22544e986139a01e5b34a62db53757ffca81bae1 | [点击此处](https://www.asterdex-testnet.com/en/api-wallet) |
 
-#### 示例：nonce 参数为当前系统微秒值，超过系统时间或落后系统时间超过 10 秒为非法请求。
+#### 示例：nonce 参数为当前系统微秒值，超过系统时间或落后系统时间超过 60 秒为非法请求。
 
 ```python
 #python

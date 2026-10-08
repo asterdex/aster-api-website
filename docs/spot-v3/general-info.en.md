@@ -104,7 +104,7 @@ You are advised to use WebSocket messages to obtain the corresponding data as mu
   * PONG frame  
   * Messages in JSON format, such as subscribe and unsubscribe.  
 * If a user sends messages that exceed the limit, the connection will be terminated. IPs that are repeatedly disconnected may be blocked by the server.  
-* A single connection can subscribe to up to **1024** Streams.
+* A single connection can subscribe to up to **200** Streams.
 
 ---
 
@@ -120,6 +120,8 @@ You are advised to use WebSocket messages to obtain the corresponding data as mu
 | USER_DATA     | A valid signer and signature are required |
 | USER_STREAM   | A valid signer and signature are required |
 | MARKET_DATA   | API that does not require authentication |
+| TRANSFER      | A valid signer and signature are required |
+| WITHDRAW      | A valid signer and signature are required |
 
 ---
 
@@ -138,7 +140,7 @@ You are advised to use WebSocket messages to obtain the corresponding data as mu
 | signer     | 0x21cF8Ae13Bb72632562c6Fff438652Ba1a151bb0                         |[Click Here](https://www.asterdex.com/en/api-wallet)         | 
 | privateKey | 0x4fd0a42218f3eae43a6ce26d22544e986139a01e5b34a62db53757ffca81bae1 |[Click Here](https://www.asterdex.com/en/api-wallet)        | 
 
-#### The nonce parameter is the current system time in microseconds. If it exceeds the system time or lags behind it by more than 10 seconds, the request is considered invalid.
+#### The nonce parameter is the current system time in microseconds. If it exceeds the system time or lags behind it by more than 60 seconds, the request is considered invalid.
 ```python
 #python
 nonce = math.trunc(time.time()*1000000)
@@ -321,8 +323,9 @@ This defines how long an order can remain valid before expiring.
 | :---- | :---- |
 | GTC (Good ‘Til Canceled) | The order remains active until it is fully executed or manually canceled. |
 | IOC (Immediate or Cancel) | The order will execute immediately for any amount available. Any unfilled portion is automatically canceled. |
-| FOK (Fill or Kill) | The order must be fully executed immediately. If it cannot be filled in full, it is canceled right away. |
+| FOK (Fill or Kill) | The order must be fully executed immediately. If it cannot be filled in full, it is canceled right away. **Note:** FOK is not currently supported for spot order placement — sending `timeInForce=FOK` to `POST /api/v3/order` returns `-1115 INVALID_TIF` regardless of order type. |
 | GTX (Good till crossing, Post only) | The post-only limit order will only be placed if it can be added as a maker order and not as a taker order.  |
+| HIDDEN | Hidden/iceberg order — not shown in the public order book. |
 
 **K-line interval:**
 

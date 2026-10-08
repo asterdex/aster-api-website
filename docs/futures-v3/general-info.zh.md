@@ -102,6 +102,8 @@ TRADE | 需要有效的signer和签名
 USER_DATA | 需要有效的signer和签名
 USER_STREAM | 需要有效的signer和签名
 MARKET_DATA | 不需要鉴权的接口
+TRANSFER | 需要有效的signer和签名
+WITHDRAW | 需要有效的signer和签名
 
 ## **鉴权签名体**
 参数 | 描述
@@ -130,7 +132,7 @@ user | 0x63DD5aCC6b1aa0f563956C0e534DD30B6dcF7C4e  | 登陆钱包地址
 signer | 0x21cF8Ae13Bb72632562c6Fff438652Ba1a151bb0 | [点击这里获取](https://www.asterdex.com/zh-CN/api-wallet)
 privateKey | 0x4fd0a42218f3eae43a6ce26d22544e986139a01e5b34a62db53757ffca81bae1 | [点击这里获取](https://www.asterdex.com/zh-CN/api-wallet)
 
-#### 示例 : nonce参数为当前系统微秒值,超过系统时间,或者落后系统时间超过10s为非法请求
+#### 示例 : nonce参数为当前系统微秒值,超过系统时间,或者落后系统时间超过60s为非法请求
 ```python
 #python
 nonce = math.trunc(time.time()*1000000)
@@ -330,7 +332,6 @@ if __name__ == '__main__':
 
 * GTC - Good Till Cancel 成交为止
 * IOC - Immediate or Cancel 无法立即成交(吃单)的部分就撤销
-* FOK - Fill or Kill 无法全部立即成交就撤销
 * GTX - Good Till Crossing 无法成为挂单方就撤销
 * HIDDEN - HIDDEN 该类型订单在订单薄里不可见
 
@@ -401,7 +402,10 @@ m -> 分钟; h -> 小时; d -> 天; w -> 周; M -> 月
 
 **限制间隔**
 
+* SECOND
+* TEN_SECONDS
 * MINUTE
+* DAY
 
 
 

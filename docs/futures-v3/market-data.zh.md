@@ -1,4 +1,4 @@
-## **Noop**
+## **Noop (TRADE)**
 
 > **Response:**
 
@@ -167,6 +167,7 @@ NONE
 
 ```javascript
 {
+	"futuresType": "U_MARGINED",
 	"exchangeFilters": [],
  	"rateLimits": [ // API访问的限制
  		{
@@ -259,7 +260,7 @@ NONE
     				"multiplierDecimal": 4
     			}
    			],
- 			"OrderType": [ // 订单类型
+ 			"orderTypes": [ // 订单类型
    				"LIMIT",  // 限价单
    				"MARKET",  // 市价单
    				"STOP", // 止损单
@@ -271,7 +272,6 @@ NONE
    			"timeInForce": [ // 有效方式
    				"GTC", // 成交为止, 一直有效
    				"IOC", // 无法立即成交(吃单)的部分就撤销
-   				"FOK", // 无法全部立即成交就撤销
    				"GTX", // 无法成为挂单方就撤销
 				"HIDDEN"
  			],
@@ -379,7 +379,7 @@ limit  | INT    | NO       | 默认:500，最大1000
 
 * 仅返回订单簿成交，即不会返回保险基金和自动减仓(ADL)成交
 
-## **查询历史成交(MARKET_DATA)**
+## **查询历史成交**
 
 > **响应:**
 
@@ -452,7 +452,6 @@ startTime | LONG   | NO       | 从该时刻之后的成交记录开始返回结
 endTime   | LONG   | NO       | 返回该时刻为止的成交记录
 limit     | INT    | NO       | 默认 500; 最大 1000.
 
-* 如果同时发送`startTime`和`endTime`，间隔必须小于一小时
 * 如果没有发送任何筛选参数(`fromId`, `startTime`, `endTime`)，默认返回最近的成交记录
 * 保险基金和自动减仓(ADL)成交不属于订单簿成交，故不会被归并聚合
 
@@ -981,3 +980,31 @@ symbol | STRING | NO       | 交易对
  名称  |  类型  | 是否必需 |  描述
 ------ | ------ | -------- | ------
 symbol | STRING | YES      | 交易对
+
+## **查询剩余可开仓名义价值**
+
+> **响应:**
+
+```javascript
+{
+  "remainingOpenableNotionalValue": "200000" // 该交易对在指定杠杆下剩余可开仓的名义价值（USDT）；"-1" 表示不限制
+}
+```
+
+``GET /fapi/v3/remainingOpenableNotionalValue``
+
+查询某交易对在指定杠杆下剩余可开仓的名义价值。该值为交易对维度的持仓量上限，与具体账户无关。
+
+**权重:**
+50
+
+**参数:**
+
+| 名称     | 类型   | 是否必需 | 描述                         |
+| -------- | ------ | -------- | ---------------------------- |
+| symbol   | STRING | YES      | 交易对                       |
+| leverage | INT    | YES      | 杠杆倍数，须为正整数         |
+
+* 返回值为 `leverage` 所在杠杆档位的剩余可开仓额度。
+* 若该交易对未配置持仓量上限，返回 `"-1"`。
+* 若 `leverage` 小于等于 0 或超过已配置的最高杠杆档位，返回 `-4028 INVALID_LEVERAGE`。

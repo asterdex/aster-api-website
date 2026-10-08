@@ -91,7 +91,7 @@
 	* PONG帧
 	* JSON格式的消息, 比如订阅, 断开订阅.
 * 如果用户发送的消息超过限制，连接会被断开连接。反复被断开连接的IP有可能被服务器屏蔽。
-* 单个连接最多可以订阅 **1024** 个Streams。
+* 单个连接最多可以订阅 **200** 个Streams。
 
 
 ## 接口鉴权类型
@@ -106,6 +106,8 @@ SPOT_TRADE | 需要有效的signer和签名
 USER_DATA | 需要有效的signer和签名
 USER_STREAM | 需要有效的signer和签名
 MARKET_DATA | 不需要鉴权的接口
+TRANSFER | 需要有效的signer和签名
+WITHDRAW | 需要有效的signer和签名
 
 
 ### POST /api/v3/order 的示例
@@ -119,7 +121,7 @@ user | 0x63DD5aCC6b1aa0f563956C0e534DD30B6dcF7C4e  | 登陆钱包地址
 signer | 0x21cF8Ae13Bb72632562c6Fff438652Ba1a151bb0 | [点击这里获取](https://www.asterdex.com/zh-CN/api-wallet)
 privateKey | 0x4fd0a42218f3eae43a6ce26d22544e986139a01e5b34a62db53757ffca81bae1 | [点击这里获取](https://www.asterdex.com/zh-CN/api-wallet)
 
-#### 示例 : nonce参数为当前系统微秒值,超过系统时间,或者落后系统时间超过10s为非法请求
+#### 示例 : nonce参数为当前系统微秒值,超过系统时间,或者落后系统时间超过60s为非法请求
 ```python
 #python
 nonce = math.trunc(time.time()*1000000)

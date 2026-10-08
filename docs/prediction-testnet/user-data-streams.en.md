@@ -6,7 +6,6 @@
 * Sending a `POST` on an account with a valid `listenKey` will return the currently valid `listenKey` and extend its validity by 60 minutes  
 * The WebSocket interface baseurl: **wss://pstream.asterdex-testnet.com**  
 * The stream name for subscribing to the user account data stream is \*\*/ws/\*\*  
-* Each connection is valid for no more than 24 hours; please handle disconnections and reconnections appropriately
 
 ## Listen Key (spot account)
 

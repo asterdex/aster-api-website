@@ -148,6 +148,38 @@ Get user's Multi-Assets mode (Multi-Assets Mode or Single-Asset Mode) on ***Ever
 | Name       | Type | Mandatory | Description |
 | ---------- | ---- | --------- | ----------- |
 
+## **Asset Exchange (TRADE)**
+
+> **Response:**
+
+```javascript
+{
+  "accountId": 123456,
+  "asset": "USDT",      // Asset whose balance was updated by the exchange
+  "balance": "100.50",  // Wallet balance of the asset after the exchange
+  "updateTime": 1774077572319
+}
+```
+
+``POST /fapi/v3/assetExchange``
+
+Manually trigger an asset exchange for the account in Multi-Assets Mode (equivalent to an auto asset exchange with a threshold of 0).
+
+**Weight:**
+1
+
+**Parameters:**
+
+| Name      | Type   | Mandatory | Description                 |
+| --------- | ------ | --------- | --------------------------- |
+| signer    | STRING | YES       | API wallet address          |
+| nonce     | LONG   | YES       | Microsecond-level timestamp |
+| signature | STRING | YES       | Signature                   |
+
+* No business parameters are required; only the common authentication parameters above are needed.
+* Only available in Multi-Assets Mode; otherwise `-4212` "User can not asset exchange while not in joint margin mode" is returned.
+* If no exchange takes place, the response body is empty.
+
 ## **New Order  (TRADE)**
 
 > **Response:**
@@ -176,7 +208,9 @@ Get user's Multi-Assets mode (Multi-Assets Mode or Single-Asset Mode) on ***Ever
   	"priceRate": "0.3",			// callback rate, only return with TRAILING_STOP_MARKET order
  	"updateTime": 1566818724722,
  	"workingType": "CONTRACT_PRICE",
- 	"priceProtect": false            // if conditional order trigger is protected
+ 	"priceProtect": false,           // if conditional order trigger is protected
+ 	"pegPriceType": "",              // BBO peg mode, only present for pegged orders
+ 	"stpMode": ""                    // Self-Trade Prevention mode, only present when set on the order
 }
 ```
 
@@ -185,7 +219,7 @@ Get user's Multi-Assets mode (Multi-Assets Mode or Single-Asset Mode) on ***Ever
 Send in a new order.
 
 **Weight:**
-1
+0
 
 **Parameters:**
 
@@ -195,7 +229,7 @@ Send in a new order.
 | side             | ENUM    | YES       |                                                                                                                                        |
 | positionSide     | ENUM    | NO        | Default`BOTH` for One-way Mode ; `LONG` or `SHORT` for Hedge Mode. It must be sent in Hedge Mode.                                      |
 | type             | ENUM    | YES       |                                                                                                                                        |
-| timeInForce      | ENUM    | NO        |                                                                                                                                        |
+| timeInForce      | ENUM    | NO        | See [ENUM definitions: Time in force](#enum-definitions)                                                                             |
 | quantity         | DECIMAL | NO        | Cannot be sent with`closePosition`=`true`(Close-All)                                                                                   |
 | reduceOnly       | STRING  | NO        | "true" or "false". default "false". Cannot be sent in Hedge Mode; cannot be sent with`closePosition`=`true`                            |
 | price            | DECIMAL | NO        |                                                                                                                                        |
@@ -223,6 +257,8 @@ Additional mandatory parameters based on `type`:
 
 * Order with type `STOP`,  parameter `timeInForce` can be sent ( default `GTC`).
 * Order with type `TAKE_PROFIT`,  parameter `timeInForce` can be sent ( default `GTC`).
+* For `STOP_MARKET`, `TAKE_PROFIT_MARKET`, `TRAILING_STOP_MARKET`: if `timeInForce` is sent, only `GTC` is accepted; any other value is rejected.
+* Sending a parameter that does not apply to the selected `type` (e.g. `stopPrice` with `LIMIT`; `timeInForce`, `price`, or `stopPrice` with `MARKET`; `price` with `STOP_MARKET`/`TAKE_PROFIT_MARKET`) returns an error (`PARAM_NOT_REQUIRED`) rather than being silently ignored.
 * Condition orders will be triggered when:
   
   * If parameter`priceProtect`is sent as true:
@@ -300,8 +336,9 @@ Name | Type | Mandatory | Description
 orderId | LONG | NO | Order ID
 origClientOrderId | STRING | NO | User-defined order ID
 symbol | STRING | YES| Trading pair
-quantity | DECIMAL| NO | Order quantity
-price | DECIMAL | NO | Order price
+side | ENUM | NO | Optional order side; if provided it is validated against the order's actual side.
+quantity | DECIMAL| YES | Order quantity
+price | DECIMAL | YES | Order price
 
 * Either `orderId` or `origClientOrderId` must be sent. If both are sent, `orderId` takes precedence.
 * Both `quantity` and `price` must be sent.
@@ -355,7 +392,7 @@ Place a **Chase strategy order** — a BBO-pegged GTX limit order that automatic
 | chaseOffsetType    | STRING  | NO        | `ABSOLUTE` (default). only supports `ABSOLUTE` for now. Will support `PERCENTAGE` later.                                                                                                   |
 | maxChaseOffset     | DECIMAL | NO        | Maximum tolerated distance from the original BBO before the chase auto-cancels. Must be `> 0`. If omitted, no distance-based auto-cancel is applied and any `maxChaseOffsetType` sent is ignored.        |
 | maxChaseOffsetType | STRING  | NO        | `ABSOLUTE` or `PERCENTAGE` (default `ABSOLUTE` when `maxChaseOffset` is sent). `ABSOLUTE`: same unit as price, must be a multiple of `tickSize`. `PERCENTAGE`: ≤ 2 decimal places.          |
-| timeInForce        | ENUM    | NO        | Default `GTX` (post-only). **`NO_FILL` is not allowed** and is rejected with `INVALID_TIF`.                                                                                                |
+| timeInForce        | ENUM    | NO        | Default `GTX` (post-only). **`NO_FILL` is not allowed** and is rejected with `INVALID_TIF`. See [ENUM definitions: Time in force](#enum-definitions).                                     |
 | clientStrategyId   | STRING  | NO        | User-defined strategy id. Auto-generated if not sent. **Length ≤ 28 characters** (DB column is `varchar(28)`). Must match `^[\.A-Z\:/a-z0-9_-]{1,28}$`.                                    |
 
 **Validation rules:**
@@ -435,7 +472,7 @@ Place a **Chase strategy order** — a BBO-pegged GTX limit order that automatic
 | side             | ENUM    | YES       |                                                                                                                                        |
 | positionSide     | ENUM    | NO        | Default`BOTH` for One-way Mode ; `LONG` or `SHORT` for Hedge Mode. It must be sent with Hedge Mode.                                    |
 | type             | ENUM    | YES       |                                                                                                                                        |
-| timeInForce      | ENUM    | NO        |                                                                                                                                        |
+| timeInForce      | ENUM    | NO        | See [ENUM definitions: Time in force](#enum-definitions)                                                                             |
 | quantity         | DECIMAL | YES       |                                                                                                                                        |
 | reduceOnly       | STRING  | NO        | "true" or "false". default "false".                                                                                                    |
 | price            | DECIMAL | NO        |                                                                                                                                        |
@@ -468,7 +505,7 @@ POST /fapi/v3/asset/wallet/transfer  (TRANSFER)
 ``
 
 **Weight:**
-5
+50
 
 **Parameters:**
 
@@ -1037,7 +1074,7 @@ Get all account orders; active, canceled, or filled.
 
 | Name       | Type   | Mandatory | Description            |
 | ---------- | ------ | --------- | ---------------------- |
-| symbol     | STRING | YES       |                        |
+| symbol     | STRING | NO        | If omitted, orders across all symbols are returned. |
 | orderId    | LONG   | NO        |                        |
 | startTime  | LONG   | NO        |                        |
 | endTime    | LONG   | NO        |                        |
@@ -1150,6 +1187,8 @@ Get all account orders; active, canceled, or filled.
 		   	"maxNotional": "250000",  	// maximum available notional with current leverage
 		   	"positionSide": "BOTH",  	// position side
 		   	"positionAmt": "0",			// position amount
+		   	"notional": "0",			// position notional value
+		   	"isolatedWallet": "0",		// isolated wallet balance
 		   	"updateTime": 0           // last update time
 		}
   	]
@@ -1159,6 +1198,8 @@ Get all account orders; active, canceled, or filled.
 ``GET /fapi/v3/accountWithJoinMargin``
 
 Get current account information.
+
+* A separate, non-join-margin endpoint `GET /fapi/v3/account` also exists (same response shape and weight, joinMargin=false); use `accountWithJoinMargin` for the join-margin view described here.
 
 **Weight:**
 5
@@ -1243,6 +1284,7 @@ Change user's initial leverage of specific symbol market.
 | positionSide | ENUM    | NO        | Default`BOTH` for One-way Mode ; `LONG` or `SHORT` for Hedge Mode. It must be sent with Hedge Mode. |
 | amount       | DECIMAL | YES       |                                                                                                     |
 | type         | INT     | YES       | 1: Add position margin，2: Reduce position margin                                                   |
+| clientTranId | STRING  | NO        | Idempotency key, max length 64 chars; requests with the same clientTranId within 7 days for the same account/symbol are rejected as duplicates |
 
 * Only for isolated symbol
 
@@ -1258,7 +1300,9 @@ Change user's initial leverage of specific symbol market.
 	  	"symbol": "BTCUSDT",
 	  	"time": 1578047897183,
 	  	"type": 1,
-	  	"positionSide": "BOTH"
+	  	"positionSide": "BOTH",
+	  	"deltaType": "TRADE",
+	  	"clientTranId": ""
 	},
 	{
 		"amount": "100",
@@ -1307,6 +1351,8 @@ Change user's initial leverage of specific symbol market.
   		"symbol": "BTCUSDT", 
   		"unRealizedProfit": "0.00000000", 
   		"positionSide": "BOTH",
+  		"notional": "0.00000000",
+  		"isolatedWallet": "0.00000000",
   		"updateTime": 0
   	}
 ]
@@ -1328,7 +1374,9 @@ Change user's initial leverage of specific symbol market.
   		"positionAmt": "20.000", 
   		"symbol": "BTCUSDT", 
   		"unRealizedProfit": "2316.83423560"
-  		"positionSide": "LONG", 
+  		"positionSide": "LONG",
+  		"notional": "133590.13423560",
+  		"isolatedWallet": "15517.54150468",
   		"updateTime": 1625474304765
   	},
   	{
@@ -1344,6 +1392,8 @@ Change user's initial leverage of specific symbol market.
   		"symbol": "BTCUSDT",
   		"unRealizedProfit": "-1156.46711780" 
   		"positionSide": "SHORT",
+  		"notional": "-66795.0671178",
+  		"isolatedWallet": "5413.95799991",
   		"updateTime": 0
   	}
 ]
@@ -1402,6 +1452,7 @@ Get trades for a specific account and symbol.
 | Name       | Type   | Mandatory | Description                                              |
 | ---------- | ------ | --------- | -------------------------------------------------------- |
 | symbol     | STRING | YES       |                                                          |
+| orderId    | LONG   | NO        | Filter trades belonging to this order id.                |
 | startTime  | LONG   | NO        |                                                          |
 | endTime    | LONG   | NO        |                                                          |
 | fromId     | LONG   | NO        | Trade id to fetch from. Default gets most recent trades. |
@@ -1410,6 +1461,7 @@ Get trades for a specific account and symbol.
 * If `startTime` and `endTime` are both not sent, then the last 7 days' data will be returned.
 * The time between `startTime` and `endTime` cannot be longer than 7 days.
 * The parameter `fromId` cannot be sent with `startTime` or `endTime`.
+* `orderId` is an additional optional filter and takes precedence over the other search modes when sent.
 
 ## **Get Income History(USER_DATA)**
 
@@ -1450,7 +1502,7 @@ Get trades for a specific account and symbol.
 | Name       | Type   | Mandatory | Description                                                                                                                      |
 | ---------- | ------ | --------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | symbol     | STRING | NO        |                                                                                                                                  |
-| incomeType | STRING | NO        | "TRANSFER"，"WELCOME_BONUS", "REALIZED_PNL"，"FUNDING_FEE", "COMMISSION", "INSURANCE_CLEAR", and "MARKET_MERCHANT_RETURN_REWARD" |
+| incomeType | STRING | NO        | "TRANSFER"，"WELCOME_BONUS", "REALIZED_PNL"，"FUNDING_FEE", "COMMISSION", "INSURANCE_CLEAR", "MARKET_MERCHANT_RETURN_REWARD", "REFERRAL_KICKBACK", "COMMISSION_REBATE", "MARKET_MAKER_REBATE", "API_REBATE", "CONTEST_REWARD", "CROSS_COLLATERAL_TRANSFER", "INTERNAL_TRANSFER", and "AUTO_EXCHANGE" |
 | startTime  | LONG   | NO        | Timestamp in ms to get funding from INCLUSIVE.                                                                                   |
 | endTime    | LONG   | NO        | Timestamp in ms to get funding until INCLUSIVE.                                                                                  |
 | limit      | INT    | NO        | Default 100; max 1000                                                                                                            |
@@ -1500,7 +1552,9 @@ Get trades for a specific account and symbol.
 }
 ```
 
-``GET /fapi/v3/leverageBracket``
+``GET /fapi/v3/leverageBrackets``
+
+*Note: `GET /fapi/v3/leverageBracket` (singular) is deprecated but still functions identically; `GET /fapi/v3/leverageBrackets` (plural) is the recommended, actively maintained path.*
 
 **Weight:** 1
 
@@ -1790,7 +1844,7 @@ Place a new strategy order. Supports OTO (One-Triggers-the-Other), OCO (One-Canc
 | quantity | STRING | YES* | Order quantity. Not required when `closePosition=true` |
 | price | STRING | YES* | Required for `LIMIT`, `STOP`, `TAKE_PROFIT` |
 | stopPrice | STRING | YES* | Required for `STOP`, `STOP_MARKET`, `TAKE_PROFIT`, `TAKE_PROFIT_MARKET` |
-| timeInForce | STRING | YES* | Required for `LIMIT`; optional for stop orders (default `GTC`). `IOC` and `FOK` are not supported |
+| timeInForce | STRING | YES* | Required for `LIMIT`; optional for stop orders (default `GTC`). `IOC` and `FOK` are not supported. See [ENUM definitions: Time in force](#enum-definitions) |
 | workingType | STRING | NO | `CONTRACT_PRICE` or `MARK_PRICE`. Default `CONTRACT_PRICE` |
 | reduceOnly | STRING | NO | Reduce-only flag |
 | closePosition | STRING | NO | Close-position flag |
@@ -1854,7 +1908,7 @@ Update one or more sub-orders of an existing strategy order. Returns an array wi
 | quantity | STRING | NO | New order quantity |
 | price | STRING | NO | New price (applicable for `LIMIT`, `STOP`, `TAKE_PROFIT`) |
 | stopPrice | STRING | NO | New stop price |
-| timeInForce | STRING | NO | New time in force |
+| timeInForce | STRING | NO | New [time in force](#enum-definitions) |
 | workingType | STRING | NO | New working type |
 | reduceOnly | STRING | NO | |
 | closePosition | STRING | NO | |
@@ -2656,6 +2710,409 @@ Retrieves a single direct announcement by its ID for the authenticated user.
 
 ---
 
+## **Get Builder User Accounts (USER_DATA)**
+
+> **Response:**
+
+```javascript
+{
+  "total": 1,
+  "currentPage": 1,
+  "totalPages": 1,
+  "pageSize": 50,
+  "hasMore": false,
+  "rows": [
+    {
+      "address": "0x1234...abcd",
+      "feeTier": 0,
+      "canTrade": true,
+      "canDeposit": true,
+      "canWithdraw": true,
+      "updateTime": 1751500000000,
+      "accountType": 0,
+      "dualSidePosition": false,
+      "jointMargin": false,
+      "feeBurn": false,
+      "feeBurnAssetId": 0,
+      "symbolConfig": [
+        {
+          "symbol": "BTCUSDT",
+          "leverage": 20,
+          "notionalLimitCoef": "10"
+        }
+      ]
+    }
+  ]
+}
+```
+
+`GET /fapi/v3/builder/userAccounts`
+
+Query account information for the users trading under the caller's builder code, with pagination. The authenticated account is used as the builder identity — there is no separate `builder` address parameter.
+
+**Weight:** 5
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| userAddresses | STRING | NO | Comma-separated list of up to 50 user wallet addresses to query |
+| symbol | STRING | NO | When sent, only this symbol's entry is returned in `symbolConfig` |
+| page | INT | NO | Page number, starting from `1`. Default: `1` |
+| limit | INT | NO | Number of results per page. Default `50`; max `1000` |
+| nonce | LONG | YES | Microsecond-level timestamp, used for replay attack prevention |
+| signer | STRING | YES | Signer address associated with the authenticated account |
+| signature | STRING | YES | Signature over the request body |
+
+* If `userAddresses` is sent, only those addresses are returned; each address must have already approved the caller's address as its builder, otherwise it is left out of `rows` and reported in `errors` instead.
+* If `userAddresses` is omitted, every user currently bound to this builder is paginated through instead, ordered by the time the binding was created.
+* `userAddresses` accepts at most 50 addresses per request; sending more is rejected.
+* The caller's own account must already have a generated on-chain address (i.e. have completed at least one deposit), or the request is rejected.
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| total | LONG | Total number of matching users |
+| currentPage | INT | Current page number |
+| totalPages | INT | Total number of pages |
+| pageSize | INT | Number of records per page |
+| hasMore | BOOLEAN | Whether more pages are available |
+| rows | ARRAY | List of account records |
+| rows[].address | STRING | Wallet address of the user |
+| rows[].feeTier | INT | Account commission tier |
+| rows[].canTrade | BOOLEAN | Whether the account can trade |
+| rows[].canDeposit | BOOLEAN | Whether the account can deposit |
+| rows[].canWithdraw | BOOLEAN | Whether the account can withdraw |
+| rows[].updateTime | LONG | Last update time (milliseconds) |
+| rows[].accountType | INT | Account type |
+| rows[].dualSidePosition | BOOLEAN | Whether Hedge Mode is enabled |
+| rows[].jointMargin | BOOLEAN | Whether Multi-Assets Mode is enabled |
+| rows[].feeBurn | BOOLEAN | Whether fee burn is enabled |
+| rows[].feeBurnAssetId | INT | Fee burn asset ID |
+| rows[].symbolConfig | ARRAY | Per-symbol configuration |
+| rows[].symbolConfig[].symbol | STRING | Symbol |
+| rows[].symbolConfig[].leverage | INT | Current initial leverage |
+| rows[].symbolConfig[].notionalLimitCoef | STRING | Notional limit coefficient |
+| errors | ARRAY | Present only when one or more requested addresses could not be returned |
+| errors[].address | STRING | The address that was left out of `rows` |
+| errors[].errorMsg | STRING | Reason the address was left out of `rows`: `This function can only be used after deposit`, `User privacy mode is enabled, this operation is not allowed.`, `Failed to check privacy switch status for this address.`, or `This user address is not bound to this builder.` (only possible when `userAddresses` is explicitly supplied) |
+
+---
+
+## **Get Builder User Open Orders (USER_DATA)**
+
+> **Response:**
+
+```javascript
+{
+  "total": 1,
+  "currentPage": 1,
+  "totalPages": 1,
+  "pageSize": 50,
+  "hasMore": false,
+  "rows": [
+    {
+      "address": "0x1234...abcd",
+      "symbol": "BTCUSDT",
+      "orderId": 1917641,
+      "clientOrderId": "abc",
+      "price": "0",
+      "origQty": "0.40",
+      "executedQty": "0",
+      "avgPrice": "0.00000",
+      "stopPrice": "9300",
+      "status": "NEW",
+      "side": "BUY",
+      "positionSide": "SHORT",
+      "type": "TRAILING_STOP_MARKET",
+      "timeInForce": "GTC",
+      "time": 1579276756075,
+      "workingType": "CONTRACT_PRICE"
+    }
+  ]
+}
+```
+
+`GET /fapi/v3/builder/userOpenOrders`
+
+Query current open orders for the users trading under the caller's builder code, with pagination. The authenticated account is used as the builder identity — there is no separate `builder` address parameter.
+
+**Weight:** 5
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| userAddresses | STRING | NO | Comma-separated list of up to 50 user wallet addresses to query |
+| symbol | STRING | NO | When sent, only open orders on this symbol are returned |
+| page | INT | NO | Page number, starting from `1`. Default: `1` |
+| limit | INT | NO | Number of results per page. Default `50`; max `1000` |
+| nonce | LONG | YES | Microsecond-level timestamp, used for replay attack prevention |
+| signer | STRING | YES | Signer address associated with the authenticated account |
+| signature | STRING | YES | Signature over the request body |
+
+* If `userAddresses` is sent, only those addresses are returned; each address must have already approved the caller's address as its builder, otherwise it is left out of `rows` and reported in `errors` instead.
+* If `userAddresses` is omitted, every user currently bound to this builder is paginated through instead, ordered by the time the binding was created. `page`/`limit` page through the bound users, not the individual orders — each returned user may contribute zero or more rows.
+* `userAddresses` accepts at most 50 addresses per request; sending more is rejected.
+* The caller's own account must already have a generated on-chain address (i.e. have completed at least one deposit), or the request is rejected.
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| total | LONG | Total number of matching users on this page's underlying query |
+| currentPage | INT | Current page number |
+| totalPages | INT | Total number of pages |
+| pageSize | INT | Number of records per page |
+| hasMore | BOOLEAN | Whether more pages are available |
+| rows | ARRAY | List of open orders across the returned users |
+| rows[].address | STRING | Wallet address of the order owner |
+| rows[].symbol | STRING | Symbol |
+| rows[].orderId | LONG | Order ID |
+| rows[].clientOrderId | STRING | Client order ID |
+| rows[].price | STRING | Order price |
+| rows[].origQty | STRING | Original order quantity |
+| rows[].executedQty | STRING | Executed quantity |
+| rows[].avgPrice | STRING | Average filled price |
+| rows[].stopPrice | STRING | Stop price |
+| rows[].status | STRING | Order status |
+| rows[].side | STRING | Order side |
+| rows[].positionSide | STRING | Position side: `BOTH`, `LONG`, `SHORT` |
+| rows[].type | STRING | Order type |
+| rows[].timeInForce | STRING | [Time in force](#enum-definitions) |
+| rows[].time | LONG | Order time (milliseconds) |
+| rows[].workingType | STRING | Working type |
+| errors | ARRAY | Present only when one or more requested addresses could not be returned |
+| errors[].address | STRING | The address that was left out of `rows` |
+| errors[].errorMsg | STRING | Reason the address was left out of `rows`: `This function can only be used after deposit`, `User privacy mode is enabled, this operation is not allowed.`, `Failed to check privacy switch status for this address.`, or `This user address is not bound to this builder.` (only possible when `userAddresses` is explicitly supplied) |
+
+---
+
+## **Get Builder User Balances (USER_DATA)**
+
+> **Response:**
+
+```javascript
+{
+  "total": 1,
+  "currentPage": 1,
+  "totalPages": 1,
+  "pageSize": 50,
+  "hasMore": false,
+  "rows": [
+    {
+      "address": "0x1234...abcd",
+      "asset": "USDT",
+      "walletBalance": "23.72469206",
+      "price": "1",
+      "balanceInUsd": "23.72469206"
+    }
+  ]
+}
+```
+
+`GET /fapi/v3/builder/userBalances`
+
+Query wallet balances for the users trading under the caller's builder code, with pagination. The authenticated account is used as the builder identity — there is no separate `builder` address parameter.
+
+**Weight:** 5
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| userAddresses | STRING | NO | Comma-separated list of up to 50 user wallet addresses to query |
+| page | INT | NO | Page number, starting from `1`. Default: `1` |
+| limit | INT | NO | Number of results per page. Default `50`; max `1000` |
+| nonce | LONG | YES | Microsecond-level timestamp, used for replay attack prevention |
+| signer | STRING | YES | Signer address associated with the authenticated account |
+| signature | STRING | YES | Signature over the request body |
+
+* If `userAddresses` is sent, only those addresses are returned; each address must have already approved the caller's address as its builder, otherwise it is left out of `rows` and reported in `errors` instead.
+* If `userAddresses` is omitted, every user currently bound to this builder is paginated through instead, ordered by the time the binding was created.
+* `userAddresses` accepts at most 50 addresses per request; sending more is rejected.
+* The caller's own account must already have a generated on-chain address (i.e. have completed at least one deposit), or the request is rejected.
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| total | LONG | Total number of matching users |
+| currentPage | INT | Current page number |
+| totalPages | INT | Total number of pages |
+| pageSize | INT | Number of records per page |
+| hasMore | BOOLEAN | Whether more pages are available |
+| rows | ARRAY | List of balance records across the returned users |
+| rows[].address | STRING | Wallet address of the balance owner |
+| rows[].asset | STRING | Asset name |
+| rows[].walletBalance | STRING | Wallet balance |
+| rows[].price | STRING | Asset price used to compute `balanceInUsd` |
+| rows[].balanceInUsd | STRING | Wallet balance converted to USD |
+| errors | ARRAY | Present only when one or more requested addresses could not be returned |
+| errors[].address | STRING | The address that was left out of `rows` |
+| errors[].errorMsg | STRING | Reason the address was left out of `rows`: `This function can only be used after deposit`, `User privacy mode is enabled, this operation is not allowed.`, `Failed to check privacy switch status for this address.`, or `This user address is not bound to this builder.` (only possible when `userAddresses` is explicitly supplied) |
+
+---
+
+## **Get Builder User Position Risk (USER_DATA)**
+
+> **Response:**
+
+```javascript
+{
+  "total": 1,
+  "currentPage": 1,
+  "totalPages": 1,
+  "pageSize": 50,
+  "hasMore": false,
+  "rows": [
+    {
+      "address": "0x1234...abcd",
+      "symbol": "BTCUSDT",
+      "positionAmt": "20.000",
+      "entryPrice": "6563.66500",
+      "markPrice": "6679.50671178",
+      "unRealizedProfit": "2316.83423560",
+      "liquidationPrice": "5930.78",
+      "leverage": "10",
+      "maxNotionalValue": "20000000",
+      "marginType": "isolated",
+      "isolatedMargin": "15517.54150468",
+      "isAutoAddMargin": "false",
+      "positionSide": "LONG",
+      "notional": "133593.13423560",
+      "isolatedWallet": "13200.70726908",
+      "updateTime": 1625474304765
+    }
+  ]
+}
+```
+
+`GET /fapi/v3/builder/userPositionRisk`
+
+Query current position information for the users trading under the caller's builder code, with pagination. The authenticated account is used as the builder identity — there is no separate `builder` address parameter.
+
+**Weight:** 5
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| userAddresses | STRING | NO | Comma-separated list of up to 50 user wallet addresses to query |
+| symbol | STRING | NO | When sent, only positions on this symbol are returned |
+| page | INT | NO | Page number, starting from `1`. Default: `1` |
+| limit | INT | NO | Number of results per page. Default `50`; max `1000` |
+| nonce | LONG | YES | Microsecond-level timestamp, used for replay attack prevention |
+| signer | STRING | YES | Signer address associated with the authenticated account |
+| signature | STRING | YES | Signature over the request body |
+
+* If `userAddresses` is sent, only those addresses are returned; each address must have already approved the caller's address as its builder, otherwise it is left out of `rows` and reported in `errors` instead.
+* If `userAddresses` is omitted, every user currently bound to this builder is paginated through instead, ordered by the time the binding was created. `page`/`limit` page through the bound users, not the individual positions — each returned user may contribute zero or more rows.
+* `userAddresses` accepts at most 50 addresses per request; sending more is rejected.
+* The caller's own account must already have a generated on-chain address (i.e. have completed at least one deposit), or the request is rejected.
+* For a user in One-way Mode, only the `BOTH`-side position is returned; for a user in Hedge Mode, the `LONG`/`SHORT`-side positions are returned.
+* `liquidationPrice` is reported as `0` whenever the underlying value would be negative.
+* This batch endpoint only returns positions with a non-zero `positionAmt`. This differs from the single-account `GET /fapi/v3/positionRisk`, which returns every symbol's position including ones with `positionAmt = 0`.
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| total | LONG | Total number of matching users on this page's underlying query |
+| currentPage | INT | Current page number |
+| totalPages | INT | Total number of pages |
+| pageSize | INT | Number of records per page |
+| hasMore | BOOLEAN | Whether more pages are available |
+| rows | ARRAY | List of position records across the returned users |
+| rows[].address | STRING | Wallet address of the position owner |
+| rows[].symbol | STRING | Symbol |
+| rows[].positionAmt | STRING | Position amount |
+| rows[].entryPrice | STRING | Average entry price |
+| rows[].markPrice | STRING | Mark price |
+| rows[].unRealizedProfit | STRING | Unrealized profit |
+| rows[].liquidationPrice | STRING | Liquidation price |
+| rows[].leverage | STRING | Current initial leverage |
+| rows[].maxNotionalValue | STRING | Maximum available notional with current leverage |
+| rows[].marginType | STRING | Margin type: `isolated` or `cross` |
+| rows[].isolatedMargin | STRING | Isolated margin |
+| rows[].isAutoAddMargin | STRING | Whether auto-add-margin is enabled for the position |
+| rows[].positionSide | STRING | Position side: `BOTH`, `LONG`, `SHORT` |
+| rows[].notional | STRING | Position notional value |
+| rows[].isolatedWallet | STRING | Isolated wallet balance |
+| rows[].updateTime | LONG | Last update time (milliseconds) |
+| errors | ARRAY | Present only when one or more requested addresses could not be returned |
+| errors[].address | STRING | The address that was left out of `rows` |
+| errors[].errorMsg | STRING | Reason the address was left out of `rows`: `This function can only be used after deposit`, `User privacy mode is enabled, this operation is not allowed.`, `Failed to check privacy switch status for this address.`, or `This user address is not bound to this builder.` (only possible when `userAddresses` is explicitly supplied) |
+
+---
+
+## **Get Builder User Commission Rates (USER_DATA)**
+
+> **Response:**
+
+```javascript
+{
+  "total": 1,
+  "currentPage": 1,
+  "totalPages": 1,
+  "pageSize": 50,
+  "hasMore": false,
+  "rows": [
+    {
+      "address": "0x1234...abcd",
+      "symbol": "BTCUSDT",
+      "makerCommissionRate": "0.0002",
+      "takerCommissionRate": "0.0004"
+    }
+  ]
+}
+```
+
+`GET /fapi/v3/builder/userCommissionRates`
+
+Query commission rates on a symbol for the users trading under the caller's builder code, with pagination. The authenticated account is used as the builder identity — there is no separate `builder` address parameter.
+
+**Weight:** 5
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| userAddresses | STRING | NO | Comma-separated list of up to 50 user wallet addresses to query |
+| symbol | STRING | YES | Symbol to look up commission rates for |
+| page | INT | NO | Page number, starting from `1`. Default: `1` |
+| limit | INT | NO | Number of results per page. Default `50`; max `1000` |
+| nonce | LONG | YES | Microsecond-level timestamp, used for replay attack prevention |
+| signer | STRING | YES | Signer address associated with the authenticated account |
+| signature | STRING | YES | Signature over the request body |
+
+* If `userAddresses` is sent, only those addresses are returned; each address must have already approved the caller's address as its builder, otherwise it is left out of `rows` and reported in `errors` instead.
+* If `userAddresses` is omitted, every user currently bound to this builder is paginated through instead, ordered by the time the binding was created.
+* `userAddresses` accepts at most 50 addresses per request; sending more is rejected.
+* The caller's own account must already have a generated on-chain address (i.e. have completed at least one deposit), or the request is rejected.
+* Each user's `makerCommissionRate`/`takerCommissionRate` is derived from their own fee tier plus any per-symbol fee adjustment on their account, the same computation used by `GET /fapi/v3/commissionRate`.
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| total | LONG | Total number of matching users |
+| currentPage | INT | Current page number |
+| totalPages | INT | Total number of pages |
+| pageSize | INT | Number of records per page |
+| hasMore | BOOLEAN | Whether more pages are available |
+| rows | ARRAY | List of commission-rate records |
+| rows[].address | STRING | Wallet address of the user |
+| rows[].symbol | STRING | Symbol |
+| rows[].makerCommissionRate | STRING | Maker commission rate |
+| rows[].takerCommissionRate | STRING | Taker commission rate |
+| errors | ARRAY | Present only when one or more requested addresses could not be returned |
+| errors[].address | STRING | The address that was left out of `rows` |
+| errors[].errorMsg | STRING | Reason the address was left out of `rows`: `This function can only be used after deposit`, `User privacy mode is enabled, this operation is not allowed.`, `Failed to check privacy switch status for this address.`, or `This user address is not bound to this builder.` (only possible when `userAddresses` is explicitly supplied) |
+
+---
+
 ## **Get Builder Trades (USER_DATA)**
 
 > **Response:**
@@ -2682,7 +3139,7 @@ Retrieves a single direct announcement by its ID for the authenticated user.
       "activeBuy": false,
       "feeAsset": "USDT",
       "totalQuota": "15.63802",
-      "fee": "0.07819010",
+      "fee": "-0.07819010",
       "orderId": 25851813,
       "realizedProfit": "-0.91539999",
       "marginAsset": "USDT",
@@ -2703,6 +3160,7 @@ Query the paginated trade history of users trading under the caller's builder co
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
+| userAddresses | STRING | NO | Comma-separated list of up to 50 user wallet addresses to query |
 | startTime | LONG | NO | Timestamp in ms |
 | endTime | LONG | NO | Timestamp in ms |
 | page | INT | NO | Page number, starting from `1`. Default: `1` |
@@ -2712,9 +3170,12 @@ Query the paginated trade history of users trading under the caller's builder co
 | signature | STRING | YES | Signature over the request body |
 
 * If neither `startTime` nor `endTime` is sent, the recent 7 days' data is returned.
-* The resolved `startTime` must not be earlier than 30 days before the current time, or the request is rejected.
+* The resolved `startTime` must not be earlier than 90 days before the current time, or the request is rejected.
 * `endTime` cannot be more than 1 day ahead of the current server time.
 * Results are ordered by trade time descending.
+* If `userAddresses` is sent, only trades of those addresses are returned; each address must have already approved the caller's address as its builder, otherwise it is left out of `rows` and reported in `errors` instead.
+* If `userAddresses` is omitted, trades of every user currently bound to this builder are returned instead.
+* `userAddresses` accepts at most 50 addresses per request; sending more is rejected.
 
 **Response Fields:**
 
@@ -2739,12 +3200,124 @@ Query the paginated trade history of users trading under the caller's builder co
 | rows[].activeBuy | BOOLEAN | Whether the trade was an active buy |
 | rows[].feeAsset | STRING | Commission asset |
 | rows[].totalQuota | STRING | Notional value of the trade (price × qty) |
-| rows[].fee | STRING | Commission paid |
+| rows[].fee | STRING | Fee for the trade, from the trading user's perspective: negative when a fee is charged, positive when a rebate is applied. Unlike most other decimal fields in this response, `fee` is not stripped of trailing zeros |
 | rows[].orderId | LONG | Order ID |
 | rows[].realizedProfit | STRING | Realized profit |
 | rows[].marginAsset | STRING | Margin (settlement) asset |
 | rows[].userAddress | STRING | Wallet address of the trading user |
 | rows[].builderFee | STRING | Builder fee charged on the trade |
+| errors | ARRAY | Present only when one or more requested addresses could not be returned |
+| errors[].address | STRING | The address that was left out of `rows` |
+| errors[].errorMsg | STRING | Reason the address was left out of `rows`: `This function can only be used after deposit`, `User privacy mode is enabled, this operation is not allowed.`, `Failed to check privacy switch status for this address.`, or `This user address is not bound to this builder.` (only possible when `userAddresses` is explicitly supplied) |
+
+---
+
+## **Get Builder All Orders (USER_DATA)**
+
+> **Response:**
+
+```javascript
+{
+  "total": 1,
+  "currentPage": 1,
+  "totalPages": 1,
+  "pageSize": 50,
+  "hasMore": false,
+  "rows": [
+    {
+      "avgPrice": "0.00000",
+      "clientOrderId": "abc",
+      "cumQuote": "0",
+      "executedQty": "0",
+      "orderId": 1917641,
+      "origQty": "0.40",
+      "origType": "TRAILING_STOP_MARKET",
+      "price": "0",
+      "reduceOnly": false,
+      "side": "BUY",
+      "positionSide": "SHORT",
+      "status": "NEW",
+      "stopPrice": "9300",
+      "closePosition": false,
+      "symbol": "BTCUSDT",
+      "time": 1579276756075,
+      "timeInForce": "GTC",
+      "type": "TRAILING_STOP_MARKET",
+      "activatePrice": "9020",
+      "priceRate": "0.3",
+      "updateTime": 1579276756075,
+      "workingType": "CONTRACT_PRICE",
+      "priceProtect": false,
+      "address": "0x1234...abcd"
+    }
+  ]
+}
+```
+
+`GET /fapi/v3/builder/userAllOrders`
+
+Query the paginated historical order records (active, canceled, or filled) of users trading under the caller's builder code. The authenticated account is used as the builder identity — there is no separate `builder` address parameter.
+
+**Weight:** 5
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| userAddresses | STRING | NO | Comma-separated list of up to 50 user wallet addresses to query |
+| symbol | STRING | NO | When sent, only orders on this symbol are returned |
+| startTime | LONG | NO | Timestamp in ms |
+| endTime | LONG | NO | Timestamp in ms |
+| page | INT | NO | Page number, starting from `1`. Default: `1` |
+| limit | INT | NO | Number of results per page. Default `50`; max `1000` |
+| nonce | LONG | YES | Microsecond-level timestamp, used for replay attack prevention |
+| signer | STRING | YES | Signer address associated with the authenticated account |
+| signature | STRING | YES | Signature over the request body |
+
+* If neither `startTime` nor `endTime` is sent, the recent 7 days' data is returned.
+* The resolved `startTime` must not be earlier than 90 days before the current time, or the request is rejected.
+* `endTime` cannot be more than 1 day ahead of the current server time.
+* If `userAddresses` is sent, only orders of those addresses are returned; each address must have already approved the caller's address as its builder, otherwise it is left out of `rows` and reported in `errors` instead.
+* If `userAddresses` is omitted, orders of every user currently bound to this builder are returned instead.
+* `userAddresses` accepts at most 50 addresses per request; sending more is rejected.
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| total | LONG | Total number of matching orders |
+| currentPage | INT | Current page number |
+| totalPages | INT | Total number of pages |
+| pageSize | INT | Number of records per page |
+| hasMore | BOOLEAN | Whether more pages are available |
+| rows | ARRAY | List of order records |
+| rows[].orderId | LONG | Order ID |
+| rows[].symbol | STRING | Symbol |
+| rows[].status | STRING | Order status |
+| rows[].clientOrderId | STRING | Client order ID |
+| rows[].price | STRING | Order price |
+| rows[].avgPrice | STRING | Average filled price |
+| rows[].origQty | STRING | Original order quantity |
+| rows[].executedQty | STRING | Executed quantity |
+| rows[].cumQuote | STRING | Cumulative quote quantity |
+| rows[].timeInForce | STRING | [Time in force](#enum-definitions) |
+| rows[].type | STRING | Order type |
+| rows[].reduceOnly | BOOLEAN | Whether reduce-only |
+| rows[].side | STRING | Order side |
+| rows[].stopPrice | STRING | Stop price. Please ignore when order type is `TRAILING_STOP_MARKET` |
+| rows[].workingType | STRING | Working type |
+| rows[].origType | STRING | Original order type |
+| rows[].time | LONG | Order time (milliseconds) |
+| rows[].updateTime | LONG | Update time (milliseconds) |
+| rows[].priceRate | STRING | Callback rate, only returned with `TRAILING_STOP_MARKET` orders |
+| rows[].activatePrice | STRING | Activation price, only returned with `TRAILING_STOP_MARKET` orders |
+| rows[].positionSide | STRING | Position side: `BOTH`, `LONG`, `SHORT` |
+| rows[].closePosition | BOOLEAN | Whether Close-All |
+| rows[].priceProtect | BOOLEAN | Whether the conditional order trigger is protected |
+| rows[].address | STRING | Wallet address of the order owner |
+| errors | ARRAY | Present only when one or more requested addresses could not be returned |
+| errors[].address | STRING | The address that was left out of `rows` |
+| errors[].errorMsg | STRING | Reason the address was left out of `rows`: `This function can only be used after deposit`, `User privacy mode is enabled, this operation is not allowed.`, `Failed to check privacy switch status for this address.`, or `This user address is not bound to this builder.` (only possible when `userAddresses` is explicitly supplied) |
 
 ---
 
@@ -2807,3 +3380,39 @@ Query the list of users who have approved the caller's address as their builder.
 | totalPages | INT | Total number of pages |
 | pageSize | INT | Effective page size used |
 | hasMore | BOOLEAN | Whether more pages exist after this one |
+
+---
+
+## **Get All Asset Logos**
+
+> **Response:**
+
+```javascript
+[
+  {
+    "assetCode": "BTC",
+    "logoUrl": "https://example.com/logo/btc.png"
+  },
+  {
+    "assetCode": "ETH",
+    "logoUrl": "https://example.com/logo/eth.png"
+  }
+]
+```
+
+`GET /fapi/v3/common/asset/all-asset-logo`
+
+Query the logo URL of every active asset. This is a public endpoint — no authentication is required.
+
+**Weight:** 1
+
+**Parameters:**
+
+None
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| assetCode | STRING | Asset name |
+| logoUrl | STRING | URL of the asset's logo image |

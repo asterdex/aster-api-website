@@ -1,4 +1,4 @@
-## **Noop**
+## **Noop (TRADE)**
 
 > **Response:**
 
@@ -162,6 +162,7 @@ NONE
 
 ```javascript
 {
+	"futuresType": "U_MARGINED",
 	"exchangeFilters": [],
  	"rateLimits": [
  		{
@@ -254,7 +255,7 @@ NONE
     				"multiplierDecimal": 4
     			}
    			],
- 			"OrderType": [
+ 			"orderTypes": [
    				"LIMIT",
    				"MARKET",
    				"STOP",
@@ -266,7 +267,6 @@ NONE
    			"timeInForce": [
    				"GTC", 
    				"IOC", 
-   				"FOK", 
    				"GTX",
           "HIDDEN" 
  			],
@@ -365,7 +365,7 @@ Get recent market trades
 
 * Market trades means trades filled in the order book. Only market trades will be returned, which means the insurance fund trades and ADL trades won't be returned.
 
-## **Old Trades Lookup (MARKET_DATA)**
+## **Old Trades Lookup**
 
 > **Response:**
 
@@ -434,7 +434,6 @@ Get compressed, aggregate market trades. Market trades that fill at the time, fr
 | endTime   | LONG   | NO        | Timestamp in ms to get aggregate trades until INCLUSIVE. |
 | limit     | INT    | NO        | Default 500; max 1000.                                   |
 
-* If both startTime and endTime are sent, time between startTime and endTime must be less than 1 hour.
 * If fromId, startTime, and endTime are not sent, the most recent aggregate trades will be returned.
 * Only market trades will be aggregated and returned, which means the insurance fund trades and ADL trades won't be aggregated.
 
@@ -952,3 +951,31 @@ Get the component exchanges and their weights for the index price of a symbol.
 | Name   | Type   | Mandatory | Description  |
 | ------ | ------ | --------- | ------------ |
 | symbol | STRING | YES       | Trading pair |
+
+## **Remaining Openable Notional Value**
+
+> **Response:**
+
+```javascript
+{
+  "remainingOpenableNotionalValue": "200000" // Remaining notional value (USDT) that can still be opened on this symbol at the given leverage; "-1" means no limit
+}
+```
+
+``GET /fapi/v3/remainingOpenableNotionalValue``
+
+Get the remaining openable notional value of a symbol at the specified leverage. This is a symbol-level open interest cap, not an account-specific value.
+
+**Weight:**
+50
+
+**Parameters:**
+
+| Name     | Type   | Mandatory | Description                          |
+| -------- | ------ | --------- | ------------------------------------ |
+| symbol   | STRING | YES       | Trading pair |
+| leverage | INT    | YES       | Leverage, must be a positive integer |
+
+* The value returned is the remaining cap of the leverage tier that `leverage` falls into.
+* `"-1"` is returned when the symbol has no open interest cap configured.
+* `-4028 INVALID_LEVERAGE` is returned if `leverage` is not greater than 0 or exceeds the highest configured leverage tier.

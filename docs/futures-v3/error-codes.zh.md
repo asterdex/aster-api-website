@@ -194,7 +194,7 @@
  * 新订单被拒绝
 
 > -2011 CANCEL_REJECTED
- * CANCEL_REJECTED
+ * 订单不存在。
  * 取消订单被拒绝
 
 > -2013 NO_SUCH_ORDER
@@ -671,3 +671,33 @@
  * 止盈止损订单价格不应低于触发价与报价乘数下限的乘积
  * Limit price can't be lower than %s.
  * 止盈止损订单价格不应低于 `%s`
+
+## 50xx - 充值与提现相关问题
+
+> -5047 INVALID_START_TIME
+ * StartTime must be within the last %s days.
+ * 起始时间必须在最近 %s 天以内
+
+> -5048 VAULT_SYMBOL_NOT_ALLOWED
+ * This symbol is not allowed for this vault's asset restriction.
+ * 该交易对不符合此金库的资产限制，不被允许
+
+> -5049 BUILDER_QUERY_NOT_ENABLED
+ * Builder query API is not enabled for this account.
+ * 该账户未启用 Builder 查询接口
+
+> -5050 DEPOSIT_REQUIRED
+ * This function can only be used after deposit.
+ * 该功能需要先完成充值后才能使用
+
+> -5051 PRIVACY_CHECK_FAILED
+ * Failed to check privacy switch status for this address.
+ * 检查该地址的隐私开关状态失败
+
+> -5052 USER_PRIVACY_MODE_ENABLED
+ * User privacy mode is enabled, this operation is not allowed.
+ * 用户已开启隐私模式，不允许该操作
+
+> -5053 USER_NOT_BOUND_TO_BUILDER
+ * This user address is not bound to this builder.
+ * 该用户地址未绑定到此Builder

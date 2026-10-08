@@ -110,6 +110,8 @@ It is recommended to use a small recvWindow of 5000 or less!
 | USER_DATA     | A valid signer and signature are required |
 | USER_STREAM   | A valid signer and signature are required |
 | MARKET_DATA   | API that does not require authentication |
+| TRANSFER      | A valid signer and signature are required |
+| WITHDRAW      | A valid signer and signature are required |
 
 ## Authentication signature payload
 
@@ -135,7 +137,7 @@ It is recommended to use a small recvWindow of 5000 or less!
 | signer     | 0x21cF8Ae13Bb72632562c6Fff438652Ba1a151bb0                         |[Click Here](https://www.asterdex-testnet.com/en/api-wallet)         | 
 | privateKey | 0x4fd0a42218f3eae43a6ce26d22544e986139a01e5b34a62db53757ffca81bae1 |[Click Here](https://www.asterdex-testnet.com/en/api-wallet)        | 
 
-#### The nonce parameter is the current system time in microseconds. If it exceeds the system time or lags behind it by more than 10 seconds, the request is considered invalid.
+#### The nonce parameter is the current system time in microseconds. If it exceeds the system time or lags behind it by more than 60 seconds, the request is considered invalid.
 
 ```python
 #python
@@ -327,7 +329,6 @@ if __name__ == '__main__':
 
 * GTC - Good Till Cancel
 * IOC - Immediate or Cancel
-* FOK - Fill or Kill
 * GTX - Good Till Crossing	(Post Only)
 * HIDDEN - HIDDEN This type of order is not visible in the order book
 
@@ -396,7 +397,10 @@ m -> minutes; h -> hours; d -> days; w -> weeks; M -> months
 
 **Rate limit intervals (interval)**
 
+* SECOND
+* TEN_SECONDS
 * MINUTE
+* DAY
 
 ## Filters
 

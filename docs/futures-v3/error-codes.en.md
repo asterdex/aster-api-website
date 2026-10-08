@@ -210,7 +210,7 @@ Codes are universal,but messages can vary.
 
 > -2011 CANCEL_REJECTED
 
-* CANCEL_REJECTED
+* Unknown order sent.
 
 > -2013 NO_SUCH_ORDER
 
@@ -681,3 +681,33 @@ Codes are universal,but messages can vary.
 
 * Price is lower than stop price multiplier floor.
 * Limit price can't be lower than %s.
+
+## 50xx - Deposit and Withdrawal Issues
+
+> -5047 INVALID_START_TIME
+
+* StartTime must be within the last %s days.
+
+> -5048 VAULT_SYMBOL_NOT_ALLOWED
+
+* This symbol is not allowed for this vault's asset restriction.
+
+> -5049 BUILDER_QUERY_NOT_ENABLED
+
+* Builder query API is not enabled for this account.
+
+> -5050 DEPOSIT_REQUIRED
+
+* This function can only be used after deposit.
+
+> -5051 PRIVACY_CHECK_FAILED
+
+* Failed to check privacy switch status for this address.
+
+> -5052 USER_PRIVACY_MODE_ENABLED
+
+* User privacy mode is enabled, this operation is not allowed.
+
+> -5053 USER_NOT_BOUND_TO_BUILDER
+
+* This user address is not bound to this builder.

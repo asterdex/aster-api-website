@@ -6,7 +6,6 @@
 * The URL format for combined streams is \*\*/stream?streams=//\*\*  
 * When subscribing to combined streams, the event payload is wrapped in this format: \*\*{"stream":"","data":}\*\*  
 * All trading pairs in stream names are **lowercase**  
-* Each link to **sstream.asterdex.com** is valid for no more than 24 hours; please handle reconnections appropriately  
 * Every 3 minutes the server sends a ping frame; the client must reply with a pong frame within 10 minutes, otherwise the server will close the connection. The client is allowed to send unpaired pong frames (i.e., the client may send pong frames at a frequency higher than once every 10 minutes to keep the connection alive).
 
 ## Real-time subscribe/unsubscribe data streams
