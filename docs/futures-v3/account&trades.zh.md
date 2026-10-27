@@ -258,8 +258,7 @@ timeInForce      | ENUM    | NO       | [有效方法](#枚举定义)
 workingType      | ENUM    | NO       | stopPrice 触发类型: `MARK_PRICE`(标记价格), `CONTRACT_PRICE`(合约最新价). 默认 `CONTRACT_PRICE`
 priceProtect | STRING | NO | 条件单触发保护："TRUE","FALSE", 默认"FALSE". 仅 `STOP`, `STOP_MARKET`, `TAKE_PROFIT`, `TAKE_PROFIT_MARKET` 需要此参数
 newOrderRespType | ENUM    | NO       | "ACK", "RESULT", 默认 "ACK"
-pegPriceType     | ENUM    | NO       | BBO peg 模式: `COUNTERPARTY_1` 或 `QUEUE_1`。在 `LIMIT` 订单上设置此参数后，撮合引擎在触发时基于订单簿的 BBO 加 `pegOffset` 解析实际价格。默认不使用 peg。
-pegOffset        | DECIMAL | NO       | 当 `pegPriceType` 已设置时，相对 BBO 的有符号偏移量。买单应为非正值（如 `-0.5`），卖单为非负值。单位与 `price` 相同，必须是 `tickSize` 的倍数。
+pegPriceType     | ENUM    | NO       | BBO peg 模式: `COUNTERPARTY_1` 或 `QUEUE_1`。撮合引擎基于订单簿的 BBO 解析实际价格：`LIMIT` 订单在下单时解析，`STOP` / `TAKE_PROFIT` 订单在触发时解析。默认不使用 peg。
 stpMode          | ENUM    | NO       | 本订单的自成交防止（STP）模式，覆盖账户级默认设置。`EXPIRE_TAKER`：撤销taker订单；`EXPIRE_MAKER`：撤销maker订单；`EXPIRE_BOTH`：同时撤销双方订单。
 
 根据 order `type`的不同，某些参数强制要求，具体如下:
@@ -389,7 +388,8 @@ price | DECIMAL | YES | 委托价格
 * 当新订单的quantity 或 price不满足PRICE_FILTER / PERCENT_FILTER / LOT_SIZE限制，修改会被拒绝，原订单依旧被保留
 订单只支持limit类型
 * 同一订单修改次数最多10000次
-* **BBO peg 订单**（使用 `pegPriceType` = `COUNTERPARTY_1` / `QUEUE_1` 下的订单）：撮合引擎在触发时从订单簿解析实际价格。普通 modify 无法改变 peg 解析后的价格。若需要持续追踪 BBO，请使用追单接口 `POST /fapi/v3/chase`。
+* 改单成功后，订单时间优先级重置，重新排至同价位队列末尾。注：该规则对仅调整数量、不调整价格的改单同样适用。
+* **BBO peg 订单**（使用 `pegPriceType` = `COUNTERPARTY_1` / `QUEUE_1` 下的订单）：撮合引擎依据订单簿解析实际价格（`LIMIT` 订单在下单时解析，`STOP` / `TAKE_PROFIT` 订单在触发时解析）。普通 modify 无法改变 peg 解析后的价格。若需要持续追踪 BBO，请使用追单接口 `POST /fapi/v3/chase`。
 
 ## **追单 (TRADE)**
 
@@ -894,6 +894,7 @@ origClientOrderIdList | LIST\<STRING\> | NO       | 用户自定义的订单号,
 * 每笔订单须传 `orderId` 或 `origClientOrderId` 之一；若同时传入，以 `orderId` 为准。
 * 每笔订单的 `quantity` 和 `price` 均为必填。
 * 各元素的参数规则与上方「修改订单」相同——仅支持 `LIMIT` 订单，受 `PRICE_FILTER` / `PERCENT_FILTER` / `LOT_SIZE` 限制，单笔订单最多修改 10000 次。
+* 改单成功后，每个被修改订单的时间优先级重置，重新排至同价位队列末尾。注：该规则对仅调整数量、不调整价格的改单同样适用。
 * 批量订单并发处理，处理顺序不保证，但响应顺序始终与请求顺序一致。
 * 非原子性——批次中每笔订单独立成功或失败，修改失败的订单保持原状，不影响其他订单。
 * 超出批量上限返回：`"Illegal characters found in parameter 'batchOrders'; legal range is '1 to 5'."` （做市商白名单账户为 `'1 to 10'`）。
@@ -1631,6 +1632,60 @@ limit      | INT    | NO       | 返回的结果集数量 默认值:100 最大�
 * "trandId" 在相同用户的同一种收益流水类型中是唯一的。
 
 
+## **分页获取账户损益资金流水(USER_DATA)**
+
+> **响应:**
+
+```javascript
+{
+	"total": 5823,		// 时间范围内符合筛选条件的总条数（所有页合计）
+	"page": 2,			// 当前页码
+	"limit": 1000,		// 每页条数
+	"hasMore": true,	// page * limit < total 时为 true
+	"rows": [
+		{
+			"symbol": "BTCUSDT",			// 交易对，仅针对涉及交易对的资金流
+			"incomeType": "FUNDING_FEE",	// 资金流类型
+			"income": "-0.01230000",		// 资金流数量，正数代表流入，负数代表流出
+			"asset": "USDT",				// 资产内容
+			"info": "",						// 备注信息，取决于流水类型
+			"time": 1759996800000,			// 时间
+			"tranId": 9689322392,			// 划转ID
+			"tradeId": ""					// 引起流水产生的原始交易ID
+		}
+	]
+}
+```
+
+``GET /fapi/v3/incomePage``
+
+**权重:**
+30
+
+**参数:**
+
+   名称    |  类型  | 是否必需 |                                              描述
+---------- | ------ | -------- | -----------------------------------------------------------------------------------------------
+symbol     | STRING | NO       | 交易对
+incomeType | STRING | NO       | 收益类型 "TRANSFER"，"WELCOME_BONUS", "REALIZED_PNL"，"FUNDING_FEE", "COMMISSION", "INSURANCE_CLEAR", "MARKET_MERCHANT_RETURN_REWARD", "REFERRAL_KICKBACK", "COMMISSION_REBATE", "MARKET_MAKER_REBATE", "API_REBATE", "CONTEST_REWARD", "CROSS_COLLATERAL_TRANSFER", "INTERNAL_TRANSFER", and "AUTO_EXCHANGE"
+startTime  | LONG   | NO       | 起始时间（毫秒，包含）
+endTime    | LONG   | NO       | 结束时间（毫秒，包含），默认为当前时间
+page       | INT    | NO       | 页码，从 1 开始，默认值:1
+limit      | INT    | NO       | 每页条数 默认值:100 最大值:1000
+nonce      | LONG   | YES      | 微秒级时间戳，用于防重放攻击
+signer     | STRING | YES      | 与当前认证账户关联的 signer 地址
+signature  | STRING | YES      | 对请求体的签名
+
+* 结果按 `time` 升序排列。
+* 如果`startTime` 和 `endTime` 均未发送, 只会返回最近7天的数据。如果只发送 `endTime`，返回从最早一条记录到 `endTime` 的数据。
+* `startTime` 和 `endTime` 之间的时间跨度不受限制，数据量较大时请通过 `page` 和 `limit` 分页获取。
+* `page` × `limit` 不能超过 100,000。需要获取更多数据时，请缩小时间范围后再分页。
+* `page` × `limit` < `total` 时 `hasMore` 为 `true`，总页数为 `ceil(total / limit)`。请求超过最后一页时返回空的 `rows`，`total` 仍为实际总条数。
+* 分页时请固定传入 `endTime`。不传 `endTime` 时默认取每次请求的当前时间，新产生的流水可能导致相邻页之间的数据错位。
+* 如果`incomeType`没有发送，返回所有类型账户损益资金流水。不支持的 `incomeType` 返回 `-1130`；`TRANSFER` 和 `WELCOME_BONUS` 不能与 `symbol` 同时发送（`-1106`）。
+* `startTime` / `endTime` 不是数字或为负数，或 `page` / `limit` 不合法时返回 `-1130`；`startTime` 晚于 `endTime` 时返回 `-1023`。
+* `rows` 中每条记录的字段和格式与 [获取账户损益资金流水](#获取账户损益资金流水user_data) 相同。
+
 ## **杠杆分层标准 (USER_DATA)**
 
 
@@ -1846,6 +1901,68 @@ GET /fapi/v3/commissionRate
 symbol | STRING | YES	
 
 
+## **查询被邀请人信息 (USER_DATA)**
+
+> **响应（该地址是调用者邀请的用户）：**
+
+```javascript
+{
+  "isInvitee": true,
+  "walletAddress": "0x1234...abcd",
+  "dateJoined": 1759499712000,   // 毫秒
+  "feePaid": "4.82052705",
+  "yourRewards": "0.48205229",
+  "expiredStatus": false
+}
+```
+
+> **响应（该地址不是调用者邀请的用户）：**
+
+```javascript
+{
+  "isInvitee": false,
+  "walletAddress": "0x1234...abcd"
+}
+```
+
+``
+GET /fapi/v3/referral/inviteeInfo``
+
+查询某个钱包地址是否通过调用者的邀请加入；如果是，返回该用户累计支付的手续费，以及调用者从该用户处累计获得的返佣。邀请人身份取自签名鉴权的账户，没有单独的邀请人参数，因此只能查询自己邀请的用户。
+
+**权重:**
+1
+
+**参数:**
+
+名称  |  类型  | 是否必需 |  描述
+------------ | ------------ | ------------ | ------------
+address | STRING | YES | 要查询的钱包地址。支持 EVM 地址（`0x` 加 40 位十六进制）和 Solana 地址（base58，32~44 位）
+
+**响应字段:**
+
+名称  |  类型  |  描述
+------------ | ------------ | ------------
+isInvitee | BOOLEAN | 该地址是否通过调用者的邀请加入
+walletAddress | STRING | 查询的地址，去掉前后空格，大小写按传入原样返回
+dateJoined | LONG | 被邀请人加入时间，毫秒时间戳。仅 `isInvitee` 为 `true` 时返回
+feePaid | STRING | 被邀请人累计支付的手续费。仅 `isInvitee` 为 `true` 时返回
+yourRewards | STRING | 调用者从该被邀请人处累计获得的返佣。仅 `isInvitee` 为 `true` 时返回
+expiredStatus | BOOLEAN | 邀请关系是否已过期。仅 `isInvitee` 为 `true` 时返回
+
+* 地址比对不区分大小写：校验和格式（大小写混写）的地址和全小写地址，查询结果相同。
+* `isInvitee` 为 `false` 时只返回 `isInvitee` 和 `walletAddress` 两个字段。地址被其他账户邀请、没有邀请人、从未注册，都属于这种情况。
+* 邀请关系自建立起 365 天内有效。已过期的邀请关系仍返回 `isInvitee: true`，同时 `expiredStatus` 为 `true`。
+* `feePaid`、`yourRewards` 是定时任务汇总的累计值，不是实时数据；以字符串返回，使用普通小数写法并去掉末尾的 0（如 `"4"`、`"123456789012.12345678"`）；被邀请人还没有交易时返回 `"0"`。
+
+**错误:**
+
+HTTP | 错误码 | 触发条件
+------------ | ------------ | ------------
+400 | -1102 | `address` 缺失、为空或全是空格：`Mandatory parameter 'address' was not sent, was empty/null, or malformed.`
+400 | -1130 | `address` 不是合法的 EVM 或 Solana 地址：`Data sent for parameter 'address' is not valid.`
+
+
 ## **更新用户MMP (USER_DATA)**
 
 > **响应:**
@@ -1961,6 +2078,8 @@ symbol | STRING | YES
 
 `POST /fapi/v3/placeStrategyOrder`
 
+> ⚠️ **BBO 腿的触发价校验通过响应体返回，而非 HTTP 状态码**：当入场腿使用 `pegPriceType` 时，止盈/止损腿的合理性校验（是否会立即触发）由策略服务执行，而非网关，因此被拒时返回 **HTTP 200** 且 `failureCode` 为 `-4142`，而不是 HTTP 400。客户端必须读取 `failureCode`，不能仅依据 HTTP 状态码判断。入场腿为 `MARKET` 的策略订单本就如此。
+
 下策略订单。支持 OTO（一单触发另一单）、OCO（一单取消另一单）、OTOCO（一单触发并取消另外两单）三种策略类型。
 
 **权重:** 50
@@ -1986,7 +2105,8 @@ symbol | STRING | YES
 | positionSide | STRING | NO | `BOTH`、`LONG`、`SHORT`，单向持仓模式下默认 `BOTH` |
 | type | STRING | YES | `LIMIT`、`MARKET`、`STOP`、`STOP_MARKET`、`TAKE_PROFIT`、`TAKE_PROFIT_MARKET`、`TRAILING_STOP_MARKET` |
 | quantity | STRING | YES* | 委托数量。`closePosition=true` 时可不填 |
-| price | STRING | YES* | `LIMIT`、`STOP`、`TAKE_PROFIT` 时必填 |
+| price | STRING | YES* | `LIMIT`、`STOP`、`TAKE_PROFIT` 时必填。传入 `pegPriceType` 时须传 `"0"`——价格由撮合引擎解析，传其他值会被拒绝 |
+| pegPriceType | ENUM | NO | 该腿的 BBO 定价策略：`COUNTERPARTY_1` / `_3` / `_5` / `_10` / `_20`，或 `QUEUE_1` / `_3` / `_5` / `_10` / `_20`。仅支持 `LIMIT`、`STOP`、`TAKE_PROFIT` 类型的腿，其他 `type` 传入将返回错误。需同时传 `price` 为 `"0"`——实际价格由撮合引擎依据订单簿计算：`LIMIT` 腿在下单时计算，`STOP` / `TAKE_PROFIT` 腿在触发时计算。不支持 `MID_PRICE`。默认不使用 peg |
 | stopPrice | STRING | YES* | `STOP`、`STOP_MARKET`、`TAKE_PROFIT`、`TAKE_PROFIT_MARKET` 时必填 |
 | timeInForce | STRING | YES* | `LIMIT` 时必填；止损类订单可选（默认 `GTC`）。不支持 `IOC` 和 `FOK`。详见[枚举定义：有效方式](#枚举定义) |
 | workingType | STRING | NO | `CONTRACT_PRICE` 或 `MARK_PRICE`，默认 `CONTRACT_PRICE` |
@@ -2112,6 +2232,8 @@ symbol | STRING | YES
 `GET /fapi/v3/strategyOpenOrder`
 
 查询当前挂单中的策略订单。`strategyId` 与 `clientStrategyId` 必须且只能提供其中一个。
+
+> **BBO 腿**：使用 `pegPriceType` 下单的腿返回 `"price": "0"`，并附带 `pegPriceType` 字段（如 `"QUEUE_1"`）；真实成交价由撮合引擎依据订单簿计算。展示时应显示 peg 标签而非该 0 值。非 peg 腿不会返回该字段。
 
 **权重:** 5
 
@@ -3363,6 +3485,84 @@ typed_data = {
 | errors | ARRAY | 仅当部分请求地址无法返回时才出现 |
 | errors[].address | STRING | 未出现在 `rows` 中的地址 |
 | errors[].errorMsg | STRING | 该地址被排除的原因：`This function can only be used after deposit`、`User privacy mode is enabled, this operation is not allowed.`、`Failed to check privacy switch status for this address.` 或 `This user address is not bound to this builder.`（仅在显式传入 `userAddresses` 时可能出现） |
+
+---
+
+# 查询Builder用户佣金 (USER_DATA)
+
+> **响应:**
+
+```javascript
+{
+  "total": 42,
+  "currentPage": 1,
+  "totalPages": 1,
+  "pageSize": 50,
+  "hasMore": false,
+  "rows": [
+    {
+      "tradeId": 698759,
+      "insertTime": 1751500000000,
+      "orderId": 25851813,
+      "symbol": "BTCUSDT",
+      "feeAsset": "USDT",
+      "marginAsset": "USDT",
+      "builderFee": "0.00050000",
+      "userAddress": "0x1234...abcd"
+    }
+  ]
+}
+```
+
+`GET /fapi/v3/builder/userCommissions`
+
+分页查询在当前调用者的Builder代码下交易的用户成交所产生的Builder手续费。查询的成交范围与 [查询Builder交易记录 (USER_DATA)](#查询builder交易记录-user_data) 相同，但仅返回手续费相关字段，且包含已开启隐私模式的用户。以已认证账户本身作为Builder身份，无需单独传入`builder`地址参数。
+
+**权重:** 5
+
+**参数:**
+
+| 名称 | 类型 | 是否必需 | 描述 |
+|------|------|---------|------|
+| userAddresses | STRING | NO | 逗号分隔的用户钱包地址列表，最多50个 |
+| startTime | LONG | NO | 起始时间戳（毫秒） |
+| endTime | LONG | NO | 结束时间戳（毫秒） |
+| page | INT | NO | 页码，从 `1` 开始。默认: `1` |
+| limit | INT | NO | 每页返回数量。默认 `50`；最大 `1000` |
+| nonce | LONG | YES | 微秒级时间戳，用于防重放攻击 |
+| signer | STRING | YES | 与当前认证账户关联的 signer 地址 |
+| signature | STRING | YES | 对请求体的签名 |
+
+* 如果 `startTime` 和 `endTime` 都未发送，则返回最近7天的数据。
+* 最终生效的 `startTime` 不能早于当前时间之前90天，否则请求会被拒绝。
+* `endTime` 不能超过当前服务器时间1天以上。
+* 结果按成交时间倒序排列。
+* 不受用户隐私模式限制：已开启隐私模式的用户的成交也会返回。
+* 如果传入 `userAddresses`，仅返回这些地址的成交记录；每个地址必须已将调用者地址授权为其Builder，否则该地址不会出现在 `rows` 中，而是记录在 `errors` 里。
+* 如果不传 `userAddresses`，则返回当前绑定到该Builder的全部用户的成交记录。
+* `userAddresses` 每次请求最多支持50个地址，超出则请求被拒绝。
+
+**响应字段:**
+
+| 字段 | 类型 | 描述 |
+|------|------|------|
+| total | LONG | 符合条件的成交总数 |
+| currentPage | INT | 当前页码 |
+| totalPages | INT | 总页数 |
+| pageSize | INT | 每页数量 |
+| hasMore | BOOLEAN | 是否还有下一页 |
+| rows | ARRAY | 佣金记录列表，每笔成交一条 |
+| rows[].tradeId | LONG | 成交ID |
+| rows[].insertTime | LONG | 成交时间（毫秒） |
+| rows[].orderId | LONG | 订单ID |
+| rows[].symbol | STRING | 交易对 |
+| rows[].feeAsset | STRING | 手续费资产 |
+| rows[].marginAsset | STRING | 保证金（结算）资产 |
+| rows[].builderFee | STRING | 该笔成交收取的Builder手续费；未收取时为 `"0"` |
+| rows[].userAddress | STRING | 交易用户的钱包地址 |
+| errors | ARRAY | 仅当部分请求地址无法返回时才出现 |
+| errors[].address | STRING | 未出现在 `rows` 中的地址 |
+| errors[].errorMsg | STRING | 该地址被排除的原因：`This function can only be used after deposit`（该地址尚未生成账户/未充值）或 `This user address is not bound to this builder.`（该地址未绑定该Builder） |
 
 ---
 

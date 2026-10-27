@@ -215,8 +215,7 @@ Send in a new order.
 | workingType      | ENUM    | NO        | stopPrice triggered by: "MARK_PRICE", "CONTRACT_PRICE". Default "CONTRACT_PRICE"                                                       |
 | priceProtect     | STRING  | NO        | "TRUE" or "FALSE", default "FALSE". Used with`STOP/STOP_MARKET` or `TAKE_PROFIT/TAKE_PROFIT_MARKET` orders.                            |
 | newOrderRespType | ENUM    | NO        | "ACK", "RESULT", default "ACK"                                                                                                         |
-| pegPriceType     | ENUM    | NO        | BBO peg mode: `COUNTERPARTY_1` or `QUEUE_1`. When set on a `LIMIT` order, the engine resolves the actual price from the order book at trigger time using the BBO + `pegOffset`. Defaults to no peg. |
-| pegOffset        | DECIMAL | NO        | Signed offset from BBO when `pegPriceType` is set. BUY orders should use a non-positive value (e.g. `-0.5`); SELL non-negative. Units: same scale as `price` (must be a `tickSize` multiple).        |
+| pegPriceType     | ENUM    | NO        | BBO peg mode: `COUNTERPARTY_1` or `QUEUE_1`. The engine resolves the actual price from the order book BBO: at placement for a `LIMIT` order, and at trigger for a `STOP` / `TAKE_PROFIT` order. Defaults to no peg. |
 | stpMode          | ENUM    | NO        | Self-Trade Prevention mode for this order. Overrides the account-level default. `EXPIRE_TAKER`: cancel the taker side; `EXPIRE_MAKER`: cancel the maker side; `EXPIRE_BOTH`: cancel both sides.      |
 | recvWindow       | LONG    | NO        |                                                                                                                                        |
 | timestamp        | LONG    | YES       |                                                                                                                                        |
@@ -318,7 +317,8 @@ price | DECIMAL | NO | Order price
 * If the new `quantity` or `price` does not meet `PRICE_FILTER` / `PERCENT_FILTER` / `LOT_SIZE` restrictions, the modification will be rejected and the original order will remain.
 * Only `LIMIT` order type is supported.
 * Maximum 10000 modifications per order.
-* **BBO-pegged orders** (those placed with `pegPriceType` = `COUNTERPARTY_1` / `QUEUE_1`): the engine resolves the actual price from the order book at trigger time. To auto-track the BBO with a continuously re-pegged limit order, use a **Chase order** (see `POST /fapi/v3/chase` below) which the strategy service polls every second and amends when the BBO moves.
+* After a successful modification, the order's time priority is reset and it moves to the back of the queue at the same price level. Note: this rule also applies when only the quantity is adjusted and the price is unchanged.
+* **BBO-pegged orders** (those placed with `pegPriceType` = `COUNTERPARTY_1` / `QUEUE_1`): the engine resolves the actual price from the order book at placement for a `LIMIT` order and at trigger for a `STOP` / `TAKE_PROFIT` order. To auto-track the BBO with a continuously re-pegged limit order, use a **Chase order** (see `POST /fapi/v3/chase` below) which the strategy service amends in real time as the BBO moves.
 
 ## Place Chase Order (TRADE)
 
@@ -823,6 +823,7 @@ Either `orderIdList` or `origClientOrderIdList ` must be sent.
 * Either `orderId` or `origClientOrderId` must be sent for each order. If both are sent, `orderId` takes precedence.
 * Both `quantity` and `price` must be sent for each order.
 * Parameter rules for each element are the same as `Modify Order` above — `LIMIT` orders only, subject to `PRICE_FILTER` / `PERCENT_FILTER` / `LOT_SIZE` restrictions, and a maximum of 10000 modifications per order.
+* After a successful modification, each modified order's time priority is reset and it moves to the back of the queue at the same price level. Note: this rule also applies when only the quantity is adjusted and the price is unchanged.
 * Batch orders are processed concurrently; the processing order is not guaranteed, but the response order always matches the request order.
 * Not atomic — each order in the batch succeeds or fails independently. A failed modification leaves the original order untouched and does not affect the other orders in the batch.
 * Exceeding the batch size limit returns: `"Illegal characters found in parameter 'batchOrders'; legal range is '1 to 5'."` (or `'1 to 10'` for MM-whitelisted accounts).
@@ -1511,6 +1512,60 @@ Get trades for a specific account and symbol.
 * If neither `startTime` nor `endTime` is sent, the recent 7-day data will be returned.
 * If `incomeType ` is not sent, all kinds of flow will be returned
 * "trandId" is unique in the same incomeType for a user
+
+## Get Income History With Pagination (USER_DATA)
+
+> **Response:**
+
+```javascript
+{
+	"total": 5823,		// number of records matching the filters in the time window, across all pages
+	"page": 2,			// current page
+	"limit": 1000,		// page size
+	"hasMore": true,	// true if page * limit < total
+	"rows": [
+		{
+			"symbol": "BTCUSDT",			// trade symbol, if existing
+			"incomeType": "FUNDING_FEE",	// income type
+			"income": "-0.01230000",		// income amount
+			"asset": "USDT",				// income asset
+			"info": "",						// extra information
+			"time": 1759996800000,
+			"tranId": 9689322392,			// transaction id
+			"tradeId": ""					// trade id, if existing
+		}
+	]
+}
+```
+
+``GET /fapi/v3/incomePage``
+
+**Weight:**
+30
+
+**Parameters:**
+
+| Name       | Type   | Mandatory | Description                                                                                           |
+| ---------- | ------ | --------- | ----------------------------------------------------------------------------------------------------- |
+| symbol     | STRING | NO        |                                                                                                       |
+| incomeType | STRING | NO        | "TRANSFER"，"WELCOME_BONUS", "REALIZED_PNL"，"FUNDING_FEE", "COMMISSION", "INSURANCE_CLEAR", "MARKET_MERCHANT_RETURN_REWARD", "REFERRAL_KICKBACK", "COMMISSION_REBATE", "MARKET_MAKER_REBATE", "API_REBATE", "CONTEST_REWARD", "CROSS_COLLATERAL_TRANSFER", "INTERNAL_TRANSFER", and "AUTO_EXCHANGE" |
+| startTime  | LONG   | NO        | Timestamp in ms, INCLUSIVE                                                                            |
+| endTime    | LONG   | NO        | Timestamp in ms, INCLUSIVE. Default: current time                                                     |
+| page       | INT    | NO        | Page number, starting from 1. Default 1                                                               |
+| limit      | INT    | NO        | Page size. Default 100; max 1000                                                                      |
+| nonce      | LONG   | YES       | Microsecond-level timestamp, used for replay attack prevention                                        |
+| signer     | STRING | YES       | Signer address associated with the currently authenticated account                                    |
+| signature  | STRING | YES       | Signature of the request                                                                              |
+
+* Records are sorted by `time` in ascending order.
+* If neither `startTime` nor `endTime` is sent, the recent 7-day data will be returned. If only `endTime` is sent, data from the earliest record up to `endTime` will be returned.
+* There is no limit on the time span between `startTime` and `endTime`; use `page` and `limit` to fetch large result sets.
+* `page` × `limit` cannot exceed 100,000. To fetch more records, narrow the time window and page again.
+* `hasMore` is `true` when `page` × `limit` < `total`. The total number of pages is `ceil(total / limit)`. A page past the end returns an empty `rows` with the actual `total`.
+* Send a fixed `endTime` when paging through results. If `endTime` is omitted, it defaults to the time of each request, so new records can shift rows between pages.
+* If `incomeType` is not sent, all kinds of flow will be returned. An unsupported `incomeType` returns `-1130`; `TRANSFER` and `WELCOME_BONUS` cannot be sent together with `symbol` (`-1106`).
+* A non-numeric or negative `startTime` / `endTime`, or an invalid `page` / `limit`, returns `-1130`. `startTime` later than `endTime` returns `-1023`.
+* Each row has the same fields and format as a [Get Income History](#get-income-historyuser_data) record.
 
 ## Notional and Leverage Brackets (USER_DATA)
 

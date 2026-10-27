@@ -225,8 +225,7 @@ timeInForce      | ENUM    | NO       | [有效方法](#枚举定义)
 workingType      | ENUM    | NO       | stopPrice 触发类型: `MARK_PRICE`(标记价格), `CONTRACT_PRICE`(合约最新价). 默认 `CONTRACT_PRICE`
 priceProtect | STRING | NO | 条件单触发保护："TRUE","FALSE", 默认"FALSE". 仅 `STOP`, `STOP_MARKET`, `TAKE_PROFIT`, `TAKE_PROFIT_MARKET` 需要此参数
 newOrderRespType | ENUM    | NO       | "ACK", "RESULT", 默认 "ACK"
-pegPriceType     | ENUM    | NO       | BBO peg 模式: `COUNTERPARTY_1` 或 `QUEUE_1`。在 `LIMIT` 订单上设置此参数后，撮合引擎在触发时基于订单簿的 BBO 加 `pegOffset` 解析实际价格。默认不使用 peg。
-pegOffset        | DECIMAL | NO       | 当 `pegPriceType` 已设置时，相对 BBO 的有符号偏移量。买单应为非正值（如 `-0.5`），卖单为非负值。单位与 `price` 相同，必须是 `tickSize` 的倍数。
+pegPriceType     | ENUM    | NO       | BBO peg 模式: `COUNTERPARTY_1` 或 `QUEUE_1`。撮合引擎基于订单簿的 BBO 解析实际价格：`LIMIT` 订单在下单时解析，`STOP` / `TAKE_PROFIT` 订单在触发时解析。默认不使用 peg。
 stpMode          | ENUM    | NO       | 本订单的自成交防止（STP）模式，覆盖账户级默认设置。`EXPIRE_TAKER`：撤销taker订单；`EXPIRE_MAKER`：撤销maker订单；`EXPIRE_BOTH`：同时撤销双方订单。
 
 根据 order `type`的不同，某些参数强制要求，具体如下:
@@ -326,7 +325,8 @@ price | DECIMAL | NO | 委托价格
 * 当新订单的quantity 或 price不满足PRICE_FILTER / PERCENT_FILTER / LOT_SIZE限制，修改会被拒绝，原订单依旧被保留
 订单只支持limit类型
 * 同一订单修改次数最多10000次
-* **BBO peg 订单**（使用 `pegPriceType` = `COUNTERPARTY_1` / `QUEUE_1` 下的订单）：撮合引擎在触发时从订单簿解析实际价格。普通 modify 无法改变 peg 解析后的价格。若需要持续追踪 BBO，请使用追单接口 `POST /fapi/v3/chase`。
+* 改单成功后，订单时间优先级重置，重新排至同价位队列末尾。注：该规则对仅调整数量、不调整价格的改单同样适用。
+* **BBO peg 订单**（使用 `pegPriceType` = `COUNTERPARTY_1` / `QUEUE_1` 下的订单）：撮合引擎依据订单簿解析实际价格（`LIMIT` 订单在下单时解析，`STOP` / `TAKE_PROFIT` 订单在触发时解析）。普通 modify 无法改变 peg 解析后的价格。若需要持续追踪 BBO，请使用追单接口 `POST /fapi/v3/chase`。
 
 ## **追单 (TRADE)**
 
@@ -833,6 +833,7 @@ origClientOrderIdList | LIST\<STRING\> | NO       | 用户自定义的订单号,
 * 每笔订单须传 `orderId` 或 `origClientOrderId` 之一；若同时传入，以 `orderId` 为准。
 * 每笔订单的 `quantity` 和 `price` 均为必填。
 * 各元素的参数规则与上方「修改订单」相同——仅支持 `LIMIT` 订单，受 `PRICE_FILTER` / `PERCENT_FILTER` / `LOT_SIZE` 限制，单笔订单最多修改 10000 次。
+* 改单成功后，每个被修改订单的时间优先级重置，重新排至同价位队列末尾。注：该规则对仅调整数量、不调整价格的改单同样适用。
 * 批量订单并发处理，处理顺序不保证，但响应顺序始终与请求顺序一致。
 * 非原子性——批次中每笔订单独立成功或失败，修改失败的订单保持原状，不影响其他订单。
 * 超出批量上限返回：`"Illegal characters found in parameter 'batchOrders'; legal range is '1 to 5'."` （做市商白名单账户为 `'1 to 10'`）。
@@ -1555,6 +1556,60 @@ limit      | INT    | NO       | 返回的结果集数量 默认值:100 最大�
 * 如果`incomeType`没有发送，返回所有类型账户损益资金流水。
 * "trandId" 在相同用户的同一种收益流水类型中是唯一的。
 
+
+## **分页获取账户损益资金流水(USER_DATA)**
+
+> **响应:**
+
+```javascript
+{
+	"total": 5823,		// 时间范围内符合筛选条件的总条数（所有页合计）
+	"page": 2,			// 当前页码
+	"limit": 1000,		// 每页条数
+	"hasMore": true,	// page * limit < total 时为 true
+	"rows": [
+		{
+			"symbol": "BTCUSDT",			// 交易对，仅针对涉及交易对的资金流
+			"incomeType": "FUNDING_FEE",	// 资金流类型
+			"income": "-0.01230000",		// 资金流数量，正数代表流入，负数代表流出
+			"asset": "USDT",				// 资产内容
+			"info": "",						// 备注信息，取决于流水类型
+			"time": 1759996800000,			// 时间
+			"tranId": 9689322392,			// 划转ID
+			"tradeId": ""					// 引起流水产生的原始交易ID
+		}
+	]
+}
+```
+
+``GET /fapi/v3/incomePage``
+
+**权重:**
+30
+
+**参数:**
+
+   名称    |  类型  | 是否必需 |                                              描述
+---------- | ------ | -------- | -----------------------------------------------------------------------------------------------
+symbol     | STRING | NO       | 交易对
+incomeType | STRING | NO       | 收益类型 "TRANSFER"，"WELCOME_BONUS", "REALIZED_PNL"，"FUNDING_FEE", "COMMISSION", "INSURANCE_CLEAR", "MARKET_MERCHANT_RETURN_REWARD", "REFERRAL_KICKBACK", "COMMISSION_REBATE", "MARKET_MAKER_REBATE", "API_REBATE", "CONTEST_REWARD", "CROSS_COLLATERAL_TRANSFER", "INTERNAL_TRANSFER", and "AUTO_EXCHANGE"
+startTime  | LONG   | NO       | 起始时间（毫秒，包含）
+endTime    | LONG   | NO       | 结束时间（毫秒，包含），默认为当前时间
+page       | INT    | NO       | 页码，从 1 开始，默认值:1
+limit      | INT    | NO       | 每页条数 默认值:100 最大值:1000
+nonce      | LONG   | YES      | 微秒级时间戳，用于防重放攻击
+signer     | STRING | YES      | 与当前认证账户关联的 signer 地址
+signature  | STRING | YES      | 对请求体的签名
+
+* 结果按 `time` 升序排列。
+* 如果`startTime` 和 `endTime` 均未发送, 只会返回最近7天的数据。如果只发送 `endTime`，返回从最早一条记录到 `endTime` 的数据。
+* `startTime` 和 `endTime` 之间的时间跨度不受限制，数据量较大时请通过 `page` 和 `limit` 分页获取。
+* `page` × `limit` 不能超过 100,000。需要获取更多数据时，请缩小时间范围后再分页。
+* `page` × `limit` < `total` 时 `hasMore` 为 `true`，总页数为 `ceil(total / limit)`。请求超过最后一页时返回空的 `rows`，`total` 仍为实际总条数。
+* 分页时请固定传入 `endTime`。不传 `endTime` 时默认取每次请求的当前时间，新产生的流水可能导致相邻页之间的数据错位。
+* 如果`incomeType`没有发送，返回所有类型账户损益资金流水。不支持的 `incomeType` 返回 `-1130`；`TRANSFER` 和 `WELCOME_BONUS` 不能与 `symbol` 同时发送（`-1106`）。
+* `startTime` / `endTime` 不是数字或为负数，或 `page` / `limit` 不合法时返回 `-1130`；`startTime` 晚于 `endTime` 时返回 `-1023`。
+* `rows` 中每条记录的字段和格式与 [获取账户损益资金流水](#获取账户损益资金流水user_data) 相同。
 
 ## **杠杆分层标准 (USER_DATA)**
 

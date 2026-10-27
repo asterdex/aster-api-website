@@ -674,6 +674,14 @@
 
 ## 50xx - 充值与提现相关问题
 
+> -5035 INVALID_PEG_PRICE
+ * BBO peg price order requires price to be 0.
+ * BBO peg 订单的 price 必须传 0
+
+> -5036 PEG_PRICE_NOT_SUPPORTED
+ * BBO peg price order is not supported for this order type.
+ * 该订单类型不支持 BBO peg 订单
+
 > -5047 INVALID_START_TIME
  * StartTime must be within the last %s days.
  * 起始时间必须在最近 %s 天以内

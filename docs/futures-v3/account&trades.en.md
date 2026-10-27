@@ -241,8 +241,7 @@ Send in a new order.
 | workingType      | ENUM    | NO        | stopPrice triggered by: "MARK_PRICE", "CONTRACT_PRICE". Default "CONTRACT_PRICE"                                                       |
 | priceProtect     | STRING  | NO        | "TRUE" or "FALSE", default "FALSE". Used with`STOP/STOP_MARKET` or `TAKE_PROFIT/TAKE_PROFIT_MARKET` orders.                            |
 | newOrderRespType | ENUM    | NO        | "ACK", "RESULT", default "ACK"                                                                                                         |
-| pegPriceType     | ENUM    | NO        | BBO peg mode: `COUNTERPARTY_1` or `QUEUE_1`. When set on a `LIMIT` order, the engine resolves the actual price from the order book at trigger time using the BBO + `pegOffset`. Defaults to no peg. |
-| pegOffset        | DECIMAL | NO        | Signed offset from BBO when `pegPriceType` is set. BUY orders should use a non-positive value (e.g. `-0.5`); SELL non-negative. Units: same scale as `price` (must be a `tickSize` multiple).        |
+| pegPriceType     | ENUM    | NO        | BBO peg mode: `COUNTERPARTY_1` or `QUEUE_1`. The engine resolves the actual price from the order book BBO: at placement for a `LIMIT` order, and at trigger for a `STOP` / `TAKE_PROFIT` order. Defaults to no peg. |
 | stpMode          | ENUM    | NO        | Self-Trade Prevention mode for this order. Overrides the account-level default. `EXPIRE_TAKER`: cancel the taker side; `EXPIRE_MAKER`: cancel the maker side; `EXPIRE_BOTH`: cancel both sides.      |
 
 Additional mandatory parameters based on `type`:
@@ -345,7 +344,8 @@ price | DECIMAL | YES | Order price
 * If the new `quantity` or `price` does not meet `PRICE_FILTER` / `PERCENT_FILTER` / `LOT_SIZE` restrictions, the modification will be rejected and the original order will remain.
 * Only `LIMIT` order type is supported.
 * Maximum 10000 modifications per order.
-* **BBO-pegged orders** (those placed with `pegPriceType` = `COUNTERPARTY_1` / `QUEUE_1`): the engine resolves the actual price from the order book at trigger time. To auto-track the BBO with a continuously re-pegged limit order, use a **Chase order** (see `POST /fapi/v3/chase` below) which the strategy service polls every second and amends when the BBO moves.
+* After a successful modification, the order's time priority is reset and it moves to the back of the queue at the same price level. Note: this rule also applies when only the quantity is adjusted and the price is unchanged.
+* **BBO-pegged orders** (those placed with `pegPriceType` = `COUNTERPARTY_1` / `QUEUE_1`): the engine resolves the actual price from the order book at placement for a `LIMIT` order and at trigger for a `STOP` / `TAKE_PROFIT` order. To auto-track the BBO with a continuously re-pegged limit order, use a **Chase order** (see `POST /fapi/v3/chase` below) which the strategy service amends in real time as the BBO moves.
 
 ## **Place Chase Order (TRADE)**
 
@@ -835,6 +835,7 @@ Either `orderIdList` or `origClientOrderIdList ` must be sent.
 * Either `orderId` or `origClientOrderId` must be sent for each order. If both are sent, `orderId` takes precedence.
 * Both `quantity` and `price` must be sent for each order.
 * Parameter rules for each element are the same as `Modify Order` above — `LIMIT` orders only, subject to `PRICE_FILTER` / `PERCENT_FILTER` / `LOT_SIZE` restrictions, and a maximum of 10000 modifications per order.
+* After a successful modification, each modified order's time priority is reset and it moves to the back of the queue at the same price level. Note: this rule also applies when only the quantity is adjusted and the price is unchanged.
 * Batch orders are processed concurrently; the processing order is not guaranteed, but the response order always matches the request order.
 * Not atomic — each order in the batch succeeds or fails independently. A failed modification leaves the original order untouched and does not affect the other orders in the batch.
 * Exceeding the batch size limit returns: `"Illegal characters found in parameter 'batchOrders'; legal range is '1 to 5'."` (or `'1 to 10'` for MM-whitelisted accounts).
@@ -1511,6 +1512,60 @@ Get trades for a specific account and symbol.
 * If `incomeType ` is not sent, all kinds of flow will be returned
 * "trandId" is unique in the same incomeType for a user
 
+## **Get Income History With Pagination (USER_DATA)**
+
+> **Response:**
+
+```javascript
+{
+	"total": 5823,		// number of records matching the filters in the time window, across all pages
+	"page": 2,			// current page
+	"limit": 1000,		// page size
+	"hasMore": true,	// true if page * limit < total
+	"rows": [
+		{
+			"symbol": "BTCUSDT",			// trade symbol, if existing
+			"incomeType": "FUNDING_FEE",	// income type
+			"income": "-0.01230000",		// income amount
+			"asset": "USDT",				// income asset
+			"info": "",						// extra information
+			"time": 1759996800000,
+			"tranId": 9689322392,			// transaction id
+			"tradeId": ""					// trade id, if existing
+		}
+	]
+}
+```
+
+``GET /fapi/v3/incomePage``
+
+**Weight:**
+30
+
+**Parameters:**
+
+| Name       | Type   | Mandatory | Description                                                                                           |
+| ---------- | ------ | --------- | ----------------------------------------------------------------------------------------------------- |
+| symbol     | STRING | NO        |                                                                                                       |
+| incomeType | STRING | NO        | "TRANSFER"，"WELCOME_BONUS", "REALIZED_PNL"，"FUNDING_FEE", "COMMISSION", "INSURANCE_CLEAR", "MARKET_MERCHANT_RETURN_REWARD", "REFERRAL_KICKBACK", "COMMISSION_REBATE", "MARKET_MAKER_REBATE", "API_REBATE", "CONTEST_REWARD", "CROSS_COLLATERAL_TRANSFER", "INTERNAL_TRANSFER", and "AUTO_EXCHANGE" |
+| startTime  | LONG   | NO        | Timestamp in ms, INCLUSIVE                                                                            |
+| endTime    | LONG   | NO        | Timestamp in ms, INCLUSIVE. Default: current time                                                     |
+| page       | INT    | NO        | Page number, starting from 1. Default 1                                                               |
+| limit      | INT    | NO        | Page size. Default 100; max 1000                                                                      |
+| nonce      | LONG   | YES       | Microsecond-level timestamp, used for replay attack prevention                                        |
+| signer     | STRING | YES       | Signer address associated with the currently authenticated account                                    |
+| signature  | STRING | YES       | Signature of the request                                                                              |
+
+* Records are sorted by `time` in ascending order.
+* If neither `startTime` nor `endTime` is sent, the recent 7-day data will be returned. If only `endTime` is sent, data from the earliest record up to `endTime` will be returned.
+* There is no limit on the time span between `startTime` and `endTime`; use `page` and `limit` to fetch large result sets.
+* `page` × `limit` cannot exceed 100,000. To fetch more records, narrow the time window and page again.
+* `hasMore` is `true` when `page` × `limit` < `total`. The total number of pages is `ceil(total / limit)`. A page past the end returns an empty `rows` with the actual `total`.
+* Send a fixed `endTime` when paging through results. If `endTime` is omitted, it defaults to the time of each request, so new records can shift rows between pages.
+* If `incomeType` is not sent, all kinds of flow will be returned. An unsupported `incomeType` returns `-1130`; `TRANSFER` and `WELCOME_BONUS` cannot be sent together with `symbol` (`-1106`).
+* A non-numeric or negative `startTime` / `endTime`, or an invalid `page` / `limit`, returns `-1130`. `startTime` later than `endTime` returns `-1023`.
+* Each row has the same fields and format as a [Get Income History](#get-income-historyuser_data) record.
+
 ## **Notional and Leverage Brackets (USER_DATA)**
 
 > **Response:**
@@ -1705,6 +1760,67 @@ Get trades for a specific account and symbol.
 | symbol     | STRING | YES       |             |
 
 
+## **Get Invitee Info (USER_DATA)**
+
+> **Response (the address is the caller's invitee):**
+
+```javascript
+{
+  "isInvitee": true,
+  "walletAddress": "0x1234...abcd",
+  "dateJoined": 1759499712000,   // ms
+  "feePaid": "4.82052705",
+  "yourRewards": "0.48205229",
+  "expiredStatus": false
+}
+```
+
+> **Response (the address is not the caller's invitee):**
+
+```javascript
+{
+  "isInvitee": false,
+  "walletAddress": "0x1234...abcd"
+}
+```
+
+``GET /fapi/v3/referral/inviteeInfo``
+
+Check whether a wallet address joined through the caller's referral, and if so, return the cumulative trading fee it has paid and the rewards the caller has earned from it. The authenticated account is used as the referrer — there is no separate referrer parameter, so an account can only query its own invitees.
+
+**Weight:**
+1
+
+**Parameters:**
+
+| Name    | Type   | Mandatory | Description |
+| ------- | ------ | --------- | ----------- |
+| address | STRING | YES       | Wallet address to check. EVM (`0x` + 40 hex characters) or Solana (base58, 32–44 characters) |
+
+**Response Fields:**
+
+| Name          | Type    | Description |
+| ------------- | ------- | ----------- |
+| isInvitee     | BOOLEAN | `true` if `address` joined through the caller's referral |
+| walletAddress | STRING  | The queried address with leading/trailing spaces removed; letter case is returned as sent |
+| dateJoined    | LONG    | Time the invitee joined, in milliseconds. Only returned when `isInvitee` is `true` |
+| feePaid       | STRING  | Cumulative trading fee paid by the invitee. Only returned when `isInvitee` is `true` |
+| yourRewards   | STRING  | Cumulative rewards the caller has earned from the invitee. Only returned when `isInvitee` is `true` |
+| expiredStatus | BOOLEAN | `true` if the referral relationship has expired. Only returned when `isInvitee` is `true` |
+
+* Address matching is case-insensitive: a checksummed (mixed-case) address and its all-lowercase form return the same result.
+* When `isInvitee` is `false`, only `isInvitee` and `walletAddress` are returned. This covers addresses invited by another account, addresses with no referrer, and addresses that have never registered.
+* A referral relationship is valid for 365 days from the time it is created. An expired relationship still returns `isInvitee: true`, with `expiredStatus: true`.
+* `feePaid` and `yourRewards` are cumulative values produced by a periodic aggregation job, so they are not real-time. They are returned as strings in plain decimal notation with trailing zeros removed (e.g. `"4"`, `"123456789012.12345678"`), and are `"0"` if the invitee has not traded yet.
+
+**Errors:**
+
+| HTTP | Code  | When |
+| ---- | ----- | ---- |
+| 400  | -1102 | `address` is missing, empty, or only spaces: `Mandatory parameter 'address' was not sent, was empty/null, or malformed.` |
+| 400  | -1130 | `address` is neither a valid EVM nor a valid Solana address: `Data sent for parameter 'address' is not valid.` |
+
+
 ## **Update User MMP (USER_DATA)**
 
 > **Response:**
@@ -1817,6 +1933,12 @@ true
 
 `POST /fapi/v3/placeStrategyOrder`
 
+> ⚠️ **A BBO leg's bracket check is reported in the response body, not the HTTP status.** When the
+> entry leg uses `pegPriceType`, the take-profit/stop-loss sanity check (an exit that would trigger
+> immediately) runs in the strategy service rather than at the gateway, so a rejection returns
+> **HTTP 200** with `failureCode` set (`-4142`), not an HTTP 400. Clients must read `failureCode`
+> rather than branching on HTTP status. This already applies to orders whose entry leg is `MARKET`.
+
 Place a new strategy order. Supports OTO (One-Triggers-the-Other), OCO (One-Cancels-the-Other), and OTOCO (One-Triggers-One-Cancels-the-Other) strategy types.
 
 **Weight:** 50
@@ -1842,7 +1964,8 @@ Place a new strategy order. Supports OTO (One-Triggers-the-Other), OCO (One-Canc
 | positionSide | STRING | NO | `BOTH`, `LONG`, `SHORT`. Default `BOTH` in one-way mode |
 | type | STRING | YES | `LIMIT`, `MARKET`, `STOP`, `STOP_MARKET`, `TAKE_PROFIT`, `TAKE_PROFIT_MARKET`, `TRAILING_STOP_MARKET` |
 | quantity | STRING | YES* | Order quantity. Not required when `closePosition=true` |
-| price | STRING | YES* | Required for `LIMIT`, `STOP`, `TAKE_PROFIT` |
+| price | STRING | YES* | Required for `LIMIT`, `STOP`, `TAKE_PROFIT`. When `pegPriceType` is set, send `"0"` — the price is resolved by the engine, and any other value is rejected |
+| pegPriceType | ENUM | NO | BBO peg mode for this leg: `COUNTERPARTY_1` / `_3` / `_5` / `_10` / `_20`, or `QUEUE_1` / `_3` / `_5` / `_10` / `_20`. Only for `LIMIT`, `STOP`, `TAKE_PROFIT` legs; any other `type` is rejected. Send `price` as `"0"` alongside it — the engine resolves the real price from the order book, at placement for a `LIMIT` leg and at trigger for a `STOP` / `TAKE_PROFIT` leg. `MID_PRICE` is not supported. Defaults to no peg |
 | stopPrice | STRING | YES* | Required for `STOP`, `STOP_MARKET`, `TAKE_PROFIT`, `TAKE_PROFIT_MARKET` |
 | timeInForce | STRING | YES* | Required for `LIMIT`; optional for stop orders (default `GTC`). `IOC` and `FOK` are not supported. See [ENUM definitions: Time in force](#enum-definitions) |
 | workingType | STRING | NO | `CONTRACT_PRICE` or `MARK_PRICE`. Default `CONTRACT_PRICE` |
@@ -1968,6 +2091,10 @@ Update one or more sub-orders of an existing strategy order. Returns an array wi
 `GET /fapi/v3/strategyOpenOrder`
 
 Query a current open strategy order. Either `strategyId` or `clientStrategyId` must be provided, but not both.
+
+> **BBO legs.** A leg placed with `pegPriceType` returns `"price": "0"` and carries a
+> `pegPriceType` field (e.g. `"QUEUE_1"`); the engine resolved the real execution price from the
+> order book. Render the peg label rather than the zero. The field is absent on non-peg legs.
 
 **Weight:** 5
 
@@ -3209,6 +3336,84 @@ Query the paginated trade history of users trading under the caller's builder co
 | errors | ARRAY | Present only when one or more requested addresses could not be returned |
 | errors[].address | STRING | The address that was left out of `rows` |
 | errors[].errorMsg | STRING | Reason the address was left out of `rows`: `This function can only be used after deposit`, `User privacy mode is enabled, this operation is not allowed.`, `Failed to check privacy switch status for this address.`, or `This user address is not bound to this builder.` (only possible when `userAddresses` is explicitly supplied) |
+
+---
+
+# Get Builder User Commissions (USER_DATA)
+
+> **Response:**
+
+```javascript
+{
+  "total": 42,
+  "currentPage": 1,
+  "totalPages": 1,
+  "pageSize": 50,
+  "hasMore": false,
+  "rows": [
+    {
+      "tradeId": 698759,
+      "insertTime": 1751500000000,
+      "orderId": 25851813,
+      "symbol": "BTCUSDT",
+      "feeAsset": "USDT",
+      "marginAsset": "USDT",
+      "builderFee": "0.00050000",
+      "userAddress": "0x1234...abcd"
+    }
+  ]
+}
+```
+
+`GET /fapi/v3/builder/userCommissions`
+
+Query the paginated builder fees earned on trades of users trading under the caller's builder code. It covers the same trades as [Get Builder Trades (USER_DATA)](#get-builder-trades-user_data), but only returns the fee fields, and also includes users who have enabled privacy mode. The authenticated account is used as the builder identity — there is no separate `builder` address parameter.
+
+**Weight:** 5
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| userAddresses | STRING | NO | Comma-separated list of up to 50 user wallet addresses to query |
+| startTime | LONG | NO | Timestamp in ms |
+| endTime | LONG | NO | Timestamp in ms |
+| page | INT | NO | Page number, starting from `1`. Default: `1` |
+| limit | INT | NO | Number of results per page. Default `50`; max `1000` |
+| nonce | LONG | YES | Microsecond-level timestamp, used for replay attack prevention |
+| signer | STRING | YES | Signer address associated with the authenticated account |
+| signature | STRING | YES | Signature over the request body |
+
+* If neither `startTime` nor `endTime` is sent, the recent 7 days' data is returned.
+* The resolved `startTime` must not be earlier than 90 days before the current time, or the request is rejected.
+* `endTime` cannot be more than 1 day ahead of the current server time.
+* Results are ordered by trade time descending.
+* Users' privacy mode does not apply: trades of users who have enabled privacy mode are returned as well.
+* If `userAddresses` is sent, only trades of those addresses are returned; each address must have already approved the caller's address as its builder, otherwise it is left out of `rows` and reported in `errors` instead.
+* If `userAddresses` is omitted, trades of every user currently bound to this builder are returned instead.
+* `userAddresses` accepts at most 50 addresses per request; sending more is rejected.
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| total | LONG | Total number of matching trades |
+| currentPage | INT | Current page number |
+| totalPages | INT | Total number of pages |
+| pageSize | INT | Number of records per page |
+| hasMore | BOOLEAN | Whether more pages are available |
+| rows | ARRAY | List of commission records, one per trade |
+| rows[].tradeId | LONG | Trade ID |
+| rows[].insertTime | LONG | Trade time (milliseconds) |
+| rows[].orderId | LONG | Order ID |
+| rows[].symbol | STRING | Symbol |
+| rows[].feeAsset | STRING | Commission asset |
+| rows[].marginAsset | STRING | Margin (settlement) asset |
+| rows[].builderFee | STRING | Builder fee charged on the trade; `"0"` if no builder fee was charged |
+| rows[].userAddress | STRING | Wallet address of the trading user |
+| errors | ARRAY | Present only when one or more requested addresses could not be returned |
+| errors[].address | STRING | The address that was left out of `rows` |
+| errors[].errorMsg | STRING | Reason the address was left out of `rows`: `This function can only be used after deposit` (address has no generated account) or `This user address is not bound to this builder.` |
 
 ---
 

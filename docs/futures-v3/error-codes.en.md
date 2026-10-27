@@ -684,6 +684,14 @@ Codes are universal,but messages can vary.
 
 ## 50xx - Deposit and Withdrawal Issues
 
+> -5035 INVALID_PEG_PRICE
+
+* BBO peg price order requires price to be 0.
+
+> -5036 PEG_PRICE_NOT_SUPPORTED
+
+* BBO peg price order is not supported for this order type.
+
 > -5047 INVALID_START_TIME
 
 * StartTime must be within the last %s days.
